@@ -41,7 +41,7 @@ export function Markets({ openAsset, onBuy }: MarketsProps) {
           <CardTitle title="Browse Markets" />
           <FilterGroup values={leagues} value={league} onChange={setLeague} label="League" />
           <FilterGroup values={positions} value={position} onChange={setPosition} label="Position" />
-          <div className="fy-filter-group">
+          <div className="fy-filter-group fy-market-control-strip">
             <Button variant="filter" aria-pressed={descending} onClick={() => setDescending((current) => !current)}><ListFilter /> Sort price {descending ? 'high' : 'low'}</Button>
             <Input aria-label="Search market" placeholder="Search market" value={query} onChange={(event) => setQuery(event.target.value)} />
             <FilterGroup values={['All', '<◈50', '◈50–200', '>◈200']} value={price} onChange={setPrice} label="Price" inline />

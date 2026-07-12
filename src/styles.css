@@ -176,6 +176,11 @@ body {
   gap: 20px;
 }
 
+.fy-markets-screen,
+.fy-portfolio-screen {
+  gap: 18px;
+}
+
 .fy-muted {
   color: var(--muted);
   font-size: 0.78rem;
@@ -375,6 +380,10 @@ body {
   gap: 18px;
 }
 
+.fy-portfolio-screen .fy-summary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
 .fy-pixel {
   font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
   letter-spacing: -0.04em;
@@ -411,11 +420,17 @@ body {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.fy-portfolio-screen .fy-allocation-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
 /* Tables and business rows */
 .fy-table-wrap {
   width: 100%;
   overflow: auto;
   border-radius: 12px;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .fy-table-wrap:focus-visible {
@@ -478,6 +493,31 @@ body {
 
 .fy-row-actions > * + * {
   margin-left: 6px;
+}
+
+.fy-markets-screen .fy-filter-rail {
+  min-width: 0;
+}
+
+.fy-markets-screen .fy-filter-group:not(.fy-market-control-strip) {
+  width: 100%;
+}
+
+.fy-market-control-strip {
+  align-items: center;
+}
+
+.fy-market-control-strip > .fy-input {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.fy-market-control-strip .fy-filter-inline-group {
+  width: 100%;
+}
+
+.fy-market-control-strip .fy-filter-inline-group .fy-button {
+  flex-shrink: 0;
 }
 
 .fy-asset-row,
@@ -1306,6 +1346,33 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .fy-markets-screen,
+  .fy-portfolio-screen {
+    gap: 16px;
+  }
+
+  .fy-market-control-strip {
+    flex-wrap: wrap;
+  }
+
+  .fy-market-control-strip > .fy-button {
+    flex: 0 0 auto;
+  }
+
+  .fy-row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+
+  .fy-row-actions > * + * {
+    margin-left: 0;
+  }
+
+  .fy-data-table {
+    min-width: 700px;
+  }
+
   .fieldyield-card-carousel {
     gap: 10px;
   }
@@ -1343,6 +1410,14 @@ body {
 
   .fy-search-panel {
     max-height: calc(100dvh - 154px);
+  }
+
+  .fy-portfolio-screen .fy-summary-grid {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
+
+  .fy-portfolio-screen .fy-allocation-grid {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   }
 
   .fy-app-header-wordmark {
@@ -1463,6 +1538,28 @@ body {
     grid-template-columns: 1fr;
   }
 
+  .fy-data-table {
+    min-width: 640px;
+  }
+
+  .fy-data-table th,
+  .fy-data-table td {
+    padding: 10px 8px;
+  }
+
+  .fy-markets-screen .fy-filter-group:not(.fy-market-control-strip),
+  .fy-market-control-strip .fy-filter-inline-group {
+    width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+
+  .fy-markets-screen .fy-filter-group:not(.fy-market-control-strip)::-webkit-scrollbar,
+  .fy-market-control-strip .fy-filter-inline-group::-webkit-scrollbar {
+    display: none;
+  }
+
   .fy-watch-row {
     grid-template-columns: auto 1fr auto;
   }
@@ -1521,6 +1618,11 @@ body {
     grid-template-columns: 1fr;
   }
 
+  .fy-portfolio-screen .fy-summary-grid,
+  .fy-portfolio-screen .fy-allocation-grid {
+    grid-template-columns: 1fr;
+  }
+
   .fy-glass-card {
     padding: 14px;
   }
@@ -1538,6 +1640,16 @@ body {
 
   .fy-search-filters::-webkit-scrollbar {
     display: none;
+  }
+
+  .fy-market-control-strip {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .fy-market-control-strip > .fy-input,
+  .fy-market-control-strip > .fy-button {
+    width: 100%;
   }
 
   .fieldyield-card-carousel {
@@ -1582,8 +1694,22 @@ body {
     justify-self: start;
   }
 
+  .fy-data-table {
+    min-width: 580px;
+  }
+
+  .fy-data-table th,
+  .fy-data-table td {
+    padding: 9px 7px;
+  }
+
   .fy-mini-stats {
     grid-template-columns: 1fr;
+  }
+
+  .fy-row-actions {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .fy-warning-severe,

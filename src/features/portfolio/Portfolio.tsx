@@ -16,7 +16,7 @@ export function Portfolio({ openAsset, onBuy }: { openAsset: (player: Player) =>
   }), [holdingsFilter]);
 
   return (
-    <div className="fy-screen">
+    <div className="fy-screen fy-portfolio-screen">
       <BlurFade><h1 className="fy-page-title"><AnimatedIcon icon={WalletIcon} size={24} aria-hidden="true" />Portfolio</h1></BlurFade>
       <BlurFade><div className="fy-summary-grid">
         <GlassCard className="fy-summary-card"><span>Total Value</span><strong className="fy-pixel">◈128,430</strong></GlassCard>
