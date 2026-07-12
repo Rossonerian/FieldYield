@@ -15,19 +15,20 @@ export function GlassCard({ className, ...props }: ComponentProps<typeof Card>) 
 
 type CardTitleProps = {
   title: string;
+  icon?: ReactNode;
   pills?: string[];
   selectedPill?: string;
   onPillChange?: (pill: string) => void;
   action?: ReactNode;
 };
 
-export function CardTitle({ title, pills = [], selectedPill, onPillChange, action }: CardTitleProps) {
+export function CardTitle({ title, icon, pills = [], selectedPill, onPillChange, action }: CardTitleProps) {
   const [internalSelection, setInternalSelection] = useState(pills[0]);
   const selected = selectedPill ?? internalSelection;
 
   return (
     <div className="fy-section-title">
-      <h2>{title}</h2>
+      <h2 className="fy-section-title-heading">{icon}{title}</h2>
       <div className="fy-section-title-actions" role="group" aria-label={`${title} filters and actions`}>
         {pills.map((pill) => (
           <Button

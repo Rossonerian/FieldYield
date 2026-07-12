@@ -110,6 +110,9 @@ body {
 }
 
 .fy-page-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
   margin: 0;
   color: var(--text);
   font-size: clamp(1.2rem, 2.2vw, 1.65rem);
@@ -121,6 +124,22 @@ body {
 .fy-section-title > h2,
 .fy-settings-panel > h2 {
   font-size: clamp(1rem, 1.5vw, 1.2rem);
+}
+
+.fy-section-title-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.fy-animated-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
+  line-height: 0;
 }
 
 .fy-asset-title h1 {

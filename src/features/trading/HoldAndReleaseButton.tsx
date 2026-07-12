@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type KeyboardEvent, type PointerEvent } from 'react';
-import { Check, RotateCcw } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
+import { CheckIcon, type CheckIconHandle } from '@/components/ui/check';
 import { cn } from '@/lib/utils';
+import { useReducedMotion } from 'motion/react';
 
 type HoldState = 'idle' | 'holding' | 'completed' | 'cancelled';
 
@@ -16,6 +18,8 @@ export function HoldAndReleaseButton({ onComplete, holdDuration = 900, idleLabel
   const resetTimer = useRef<number | null>(null);
   const activeInput = useRef<'pointer' | 'keyboard' | null>(null);
   const completed = useRef(false);
+  const checkRef = useRef<CheckIconHandle>(null);
+  const reduceMotion = useReducedMotion();
   const instructionsId = `fy-hold-instructions-${useId().replaceAll(':', '')}`;
 
   const clearTimers = useCallback(() => {
@@ -80,6 +84,10 @@ export function HoldAndReleaseButton({ onComplete, holdDuration = 900, idleLabel
 
   useEffect(() => clearTimers, [clearTimers]);
 
+  useEffect(() => {
+    if (state === 'completed' && !reduceMotion) checkRef.current?.startAnimation();
+  }, [reduceMotion, state]);
+
   const handlePointerDown = (event: PointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return;
     event.preventDefault();
@@ -121,7 +129,7 @@ export function HoldAndReleaseButton({ onComplete, holdDuration = 900, idleLabel
       onBlur={cancel}
     >
       <span className="fy-hold-progress" aria-hidden="true" />
-      <span className="fy-hold-content">{state === 'completed' && <Check size={15} />}{state === 'cancelled' && <RotateCcw size={15} />}{label}</span>
+      <span className="fy-hold-content">{state === 'completed' && <CheckIcon ref={checkRef} className="fy-animated-icon" size={15} animateOnHover={false} aria-hidden="true" />}{state === 'cancelled' && <RotateCcw size={15} aria-hidden="true" />}{label}</span>
       <span id={instructionsId} className="fy-sr-only">Hold until progress completes. Releasing early cancels.</span>
       <span className="fy-sr-only" aria-live="polite">{state === 'completed' || state === 'cancelled' ? label : ''}</span>
     </button>

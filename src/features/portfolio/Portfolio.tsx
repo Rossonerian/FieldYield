@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
+import { WalletIcon } from '@/components/ui/wallet';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { BadgeDelta } from '@/components/ui/badge-delta';
 import { Bars, CardTitle, Donut, GlassCard, PlayerTable, TreeMap } from '@/components/shared/field-components';
 import { players, type Player } from '@/data/fieldyield';
+import { AnimatedIcon } from '@/components/ui/animated-icon';
 
 export function Portfolio({ openAsset, onBuy }: { openAsset: (player: Player) => void; onBuy: (player: Player) => void }) {
   const [holdingsFilter, setHoldingsFilter] = useState('All');
@@ -15,7 +17,7 @@ export function Portfolio({ openAsset, onBuy }: { openAsset: (player: Player) =>
 
   return (
     <div className="fy-screen">
-      <BlurFade><h1 className="fy-page-title">Portfolio</h1></BlurFade>
+      <BlurFade><h1 className="fy-page-title"><AnimatedIcon icon={WalletIcon} size={24} aria-hidden="true" />Portfolio</h1></BlurFade>
       <BlurFade><div className="fy-summary-grid">
         <GlassCard className="fy-summary-card"><span>Total Value</span><strong className="fy-pixel">◈128,430</strong></GlassCard>
         <GlassCard className="fy-summary-card"><span>Total Return</span><strong className="fy-gain"><BadgeDelta value="+18.4%" deltaType="increase" /></strong></GlassCard>

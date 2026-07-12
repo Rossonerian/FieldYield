@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ActivityIcon } from '@/components/ui/activity';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { Badge } from '@/components/ui/badge';
 import { BadgeDelta } from '@/components/ui/badge-delta';
@@ -6,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { CardCarousel } from '@/components/ui/card-carousel';
 import { activity, dividends, players, type ModalName, type Player, type Screen } from '@/data/fieldyield';
 import { AssetRow, CardTitle, FeedRow, GlassCard, MiniChart, PlayerTable, RankList } from '@/components/shared/field-components';
+import { AnimatedIcon } from '@/components/ui/animated-icon';
 
 type DashboardProps = {
   openAsset: (player: Player) => void;
@@ -85,7 +87,7 @@ export function Dashboard({ openAsset, setScreen, setModal, onBuy }: DashboardPr
             {visibleDividends.map((row) => <FeedRow key={row.join()} row={row} onClick={() => setModal('dividend')} />)}
           </GlassCard>
           <GlassCard key="recent-activity" className="fy-dashboard-card">
-            <CardTitle title="Recent Activity" />
+            <CardTitle title="Recent Activity" icon={<AnimatedIcon icon={ActivityIcon} size={17} aria-hidden="true" />} />
             {activity.map(([time, text]) => <div className="fy-activity-row" key={time}><span>{time}</span><strong>{text}</strong></div>)}
           </GlassCard>
         </CardCarousel>

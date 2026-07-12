@@ -1,9 +1,11 @@
-import { Bell, ChevronDown } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
+import { BellIcon } from '@/components/ui/bell';
 
 import { ActionSearchBar, type SearchItem } from '@/features/search/ActionSearchBar';
 import { AlertBadge } from '@/components/ui/alert-badge';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { AnimatedIcon } from '@/components/ui/animated-icon';
 import { ThemeSwitch } from '@/features/theme/ThemeSwitch';
 import { cn } from '@/lib/utils';
 
@@ -65,7 +67,7 @@ export function Header({
         onClick={onBell}
         aria-label={`Open notifications${notificationCount > 0 ? `, ${notificationCount} unread` : ''}`}
       >
-        <Bell size={19} aria-hidden="true" />
+        <AnimatedIcon icon={BellIcon} size={19} aria-hidden="true" />
         {notificationCount > 0 && (
           <AlertBadge
             className="fy-app-header-notification-count"

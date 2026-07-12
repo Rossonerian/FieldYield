@@ -6,7 +6,7 @@ import {
   useSpring,
   useTransform,
   type MotionValue,
-} from 'framer-motion';
+} from 'motion/react';
 
 import {
   primaryNavigationItems,
@@ -120,9 +120,15 @@ function DockItem({ item, active, pointerX, reduceMotion, onSelect }: DockItemPr
           aria-hidden="true"
         />
       )}
-      <span className="fy-desktop-dock-icon" aria-hidden="true">
+      <motion.span
+        className="fy-desktop-dock-icon"
+        aria-hidden="true"
+        animate={active && !reduceMotion ? { rotate: [0, -3, 3, 0] } : { rotate: 0 }}
+        whileHover={!reduceMotion ? { rotate: [0, -4, 4, 0] } : undefined}
+        transition={{ duration: 0.38, ease: 'easeInOut' }}
+      >
         <Icon size={22} strokeWidth={2.2} />
-      </span>
+      </motion.span>
     </motion.button>
     </Tooltip>
   );

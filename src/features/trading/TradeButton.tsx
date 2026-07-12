@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState, type ButtonHTMLAttributes, type MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion, useReducedMotion } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { createTradeParticles, type TradeButtonType, type TradeParticle } from './trade-particles';
 

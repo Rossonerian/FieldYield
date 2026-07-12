@@ -1,8 +1,10 @@
 import * as React from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Search, SendHorizontal } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { SendHorizontal } from 'lucide-react';
+import { SearchIcon } from '@/components/ui/search';
 
 import { Button } from '@/components/ui/button';
+import { AnimatedIcon } from '@/components/ui/animated-icon';
 
 export const SEARCH_FILTERS = [
   'All',
@@ -375,7 +377,7 @@ export function ActionSearchBar({
             transition={{ duration: prefersReducedMotion ? 0 : 0.16 }}
             aria-hidden="true"
           >
-            {hasQuery ? <SendHorizontal size={16} /> : <Search size={16} />}
+            {hasQuery ? <SendHorizontal size={16} /> : <AnimatedIcon icon={SearchIcon} size={16} aria-hidden="true" />}
           </motion.span>
         </AnimatePresence>
         <input
