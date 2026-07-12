@@ -325,7 +325,7 @@ export function CardCarousel({
                 aria-roledescription="slide"
                 data-active={isActive ? 'true' : 'false'}
                 inert={!isActive}
-                className="min-w-0 shrink-0 basis-[86%] sm:basis-[70%] md:basis-[58%] lg:basis-[48%] xl:basis-[40%]"
+                className="fieldyield-card-carousel-slide min-w-0 shrink-0 basis-[86%] sm:basis-[70%] md:basis-[58%] lg:basis-[48%] xl:basis-[40%]"
                 animate={{
                   opacity: isActive ? 1 : 0.7,
                   scale: isActive ? 1 : 0.975,

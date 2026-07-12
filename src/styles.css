@@ -93,6 +93,7 @@ body {
   position: relative;
   isolation: isolate;
   min-height: 100vh;
+  overflow-x: clip;
   color: var(--text);
 }
 
@@ -314,6 +315,10 @@ body {
   overflow: hidden;
 }
 
+.fy-glass-card > * {
+  min-width: 0;
+}
+
 .fy-card,
 .fy-glass-card {
   border-color: color-mix(in srgb, var(--edge) 88%, transparent);
@@ -427,6 +432,7 @@ body {
 /* Tables and business rows */
 .fy-table-wrap {
   width: 100%;
+  max-width: 100%;
   overflow: auto;
   border-radius: 12px;
   overscroll-behavior-x: contain;
@@ -476,8 +482,13 @@ body {
 .fy-player-cell,
 .fy-player-summary {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 9px;
+}
+
+.fy-player-cell {
+  white-space: nowrap;
 }
 
 .fy-confirmation-note {
@@ -540,6 +551,10 @@ body {
   gap: 9px;
   margin: 6px 0;
   padding: 8px;
+}
+
+.fy-asset-row > span {
+  min-width: 0;
 }
 
 .fy-asset-row small,
@@ -610,7 +625,7 @@ body {
 
 .fy-mini-chart-large {
   position: relative;
-  height: 280px;
+  height: clamp(180px, 28vw, 280px);
   align-items: center;
   padding: 20px;
   border: 1px solid var(--edge);
@@ -648,7 +663,7 @@ body {
 
 .fy-stats > div {
   display: grid;
-  grid-template-columns: 90px 1fr;
+  grid-template-columns: minmax(70px, 90px) minmax(0, 1fr);
   align-items: center;
   gap: 10px;
   margin: 10px 0;
@@ -674,10 +689,11 @@ body {
 
 .fy-bars {
   display: flex;
-  height: 180px;
+  min-height: 150px;
+  height: clamp(150px, 24vw, 180px);
   align-items: end;
   justify-content: center;
-  gap: 18px;
+  gap: clamp(10px, 2vw, 18px);
 }
 
 .fy-bars > div {
@@ -697,8 +713,9 @@ body {
 }
 
 .fy-donut {
-  width: 170px;
-  height: 170px;
+  width: min(170px, 100%);
+  aspect-ratio: 1;
+  height: auto;
   margin: 0 auto;
   border-radius: 50%;
   background: conic-gradient(var(--pink) 0 38%, var(--teal) 38% 72%, var(--gold) 72% 100%);
@@ -707,7 +724,8 @@ body {
 
 .fy-tree-map {
   display: grid;
-  height: 180px;
+  min-height: 150px;
+  height: clamp(150px, 24vw, 180px);
   grid-template-columns: 2fr 1fr;
   grid-template-rows: 1fr 1fr;
   gap: 8px;
@@ -729,6 +747,11 @@ body {
   grid-template-columns: auto 1fr auto auto;
   align-items: center;
   gap: 18px;
+}
+
+.fy-asset-title,
+.fy-asset-title > div {
+  min-width: 0;
 }
 
 .fy-asset-title h1 {
@@ -797,6 +820,7 @@ body {
 .fy-bundle-list,
 .fy-dividend-dialog-list {
   display: grid;
+  min-width: 0;
   gap: 14px;
 }
 
@@ -1005,7 +1029,7 @@ body {
 /* Squad, filters, settings */
 .fy-squad-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
   gap: 14px;
 }
 
@@ -1044,7 +1068,7 @@ body {
 
 .fy-watch-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) 140px auto;
+  grid-template-columns: auto minmax(0, 1fr) minmax(120px, 140px) auto;
   align-items: center;
   gap: 10px;
 }
@@ -1062,6 +1086,7 @@ body {
 }
 
 .fy-settings-nav {
+  min-width: 0;
   align-content: start;
 }
 
@@ -1090,6 +1115,7 @@ body {
 
 .fy-dialog-motion {
   width: min(560px, 100%);
+  max-width: 100%;
 }
 
 .fy-dialog-content {
@@ -1120,6 +1146,7 @@ body {
 
 .fy-dialog-body {
   display: grid;
+  min-width: 0;
   gap: 12px;
 }
 
@@ -1330,7 +1357,8 @@ body {
 
 @media (max-width: 1200px) {
   .fy-main-frame {
-    padding-inline: 18px;
+    width: min(100%, 1180px);
+    padding: 118px 18px 126px;
   }
 
   .fy-app-header {
@@ -1344,6 +1372,22 @@ body {
 
   .fy-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fy-dashboard-screen {
+    gap: 22px;
+  }
+
+  .fy-dashboard-card {
+    min-height: 250px;
+  }
+
+  .fy-dashboard-card-wide {
+    min-height: 400px;
+  }
+
+  .fieldyield-card-carousel-slide {
+    flex-basis: 46%;
   }
 
   .fy-markets-screen,
@@ -1373,6 +1417,31 @@ body {
     min-width: 700px;
   }
 
+  .fy-asset-layout {
+    grid-template-columns: minmax(0, 1.65fr) minmax(300px, 360px);
+    gap: 16px;
+  }
+
+  .fy-asset-header {
+    gap: 14px;
+  }
+
+  .fy-mini-stats {
+    min-width: 280px;
+  }
+
+  .fy-depth {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fy-depth > .fy-badge {
+    justify-self: start;
+  }
+
+  .fy-settings-screen {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+
   .fieldyield-card-carousel {
     gap: 10px;
   }
@@ -1390,6 +1459,10 @@ body {
 }
 
 @media (max-width: 900px) {
+  .fy-screen {
+    gap: 16px;
+  }
+
   .fy-app-header {
     grid-template-columns: 1fr auto auto auto;
     min-height: 132px;
@@ -1476,8 +1549,25 @@ body {
     gap: 10px;
   }
 
-  .fieldyield-card-carousel > div {
+  .fieldyield-card-carousel > div,
+  .fieldyield-card-carousel-slide {
     min-width: 0;
+  }
+
+  .fieldyield-card-carousel-slide {
+    flex-basis: 76%;
+  }
+
+  .fy-dashboard-card {
+    min-height: 235px;
+  }
+
+  .fy-dashboard-card-wide {
+    min-height: 370px;
+  }
+
+  .fy-dashboard-scroll-card {
+    max-height: 370px;
   }
 
   .fy-mobile-navigation-item {
@@ -1502,6 +1592,22 @@ body {
     grid-template-columns: 1fr;
   }
 
+  .fy-settings-nav {
+    display: flex;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 12px;
+    scrollbar-width: none;
+  }
+
+  .fy-settings-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .fy-settings-nav .fy-button {
+    flex-shrink: 0;
+  }
+
   .fy-asset-header {
     grid-template-columns: auto 1fr;
   }
@@ -1521,6 +1627,10 @@ body {
     order: -1;
   }
 
+  .fy-asset-main {
+    gap: 12px;
+  }
+
   .fy-trading-panel {
     display: none;
   }
@@ -1536,6 +1646,11 @@ body {
 
   .fy-team-bonds {
     grid-template-columns: 1fr;
+  }
+
+  .fy-squad-grid {
+    grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+    gap: 12px;
   }
 
   .fy-data-table {
@@ -1589,6 +1704,16 @@ body {
     width: auto;
   }
 
+  .fy-dialog-overlay {
+    align-items: start;
+    padding: 12px;
+  }
+
+  .fy-dialog-content {
+    max-height: calc(100dvh - 24px);
+    padding: 18px;
+  }
+
   .fy-toast {
     right: 12px;
     bottom: 126px;
@@ -1598,6 +1723,10 @@ body {
 }
 
 @media (max-width: 620px) {
+  .fy-screen {
+    gap: 14px;
+  }
+
   .fy-app-header {
     grid-template-columns: 1fr auto auto;
   }
@@ -1628,7 +1757,7 @@ body {
   }
 
   .fy-main-frame {
-    padding-inline: 10px;
+    padding: 150px 10px 132px;
   }
 
   .fy-search-filters {
@@ -1656,8 +1785,12 @@ body {
     gap: 8px;
   }
 
-  .fieldyield-card-carousel > div {
+  .fieldyield-card-carousel-slide {
     flex-basis: 92%;
+  }
+
+  .fieldyield-card-carousel [role="group"][aria-label$="controls"] {
+    gap: 6px;
   }
 
   .fy-section-title {
@@ -1673,11 +1806,20 @@ body {
   }
 
   .fy-dashboard-card-wide {
-    min-height: 390px;
+    min-height: 350px;
+  }
+
+  .fy-dashboard-card {
+    min-height: 215px;
+  }
+
+  .fy-dashboard-scroll-card {
+    max-height: 340px;
   }
 
   .fy-asset-row {
-    grid-template-columns: auto minmax(90px, 1fr) auto;
+    grid-template-columns: auto minmax(82px, 1fr) auto;
+    gap: 7px;
   }
 
   .fy-asset-row .fy-badge-delta,
@@ -1707,15 +1849,82 @@ body {
     grid-template-columns: 1fr;
   }
 
+  .fy-mini-chart-large {
+    height: 190px;
+    padding: 14px;
+  }
+
+  .fy-volume-bars {
+    height: 54px;
+    gap: 3px;
+  }
+
+  .fy-depth,
+  .fy-stats > div {
+    grid-template-columns: 1fr;
+  }
+
+  .fy-bars {
+    min-height: 130px;
+    height: 150px;
+  }
+
+  .fy-bars i {
+    width: 24px;
+  }
+
+  .fy-tree-map {
+    min-height: 135px;
+    height: 150px;
+  }
+
   .fy-row-actions {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .fy-squad-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .fy-squad-card,
+  .fy-empty-slot {
+    min-height: 154px;
+    padding: 10px;
+  }
+
+  .fy-watch-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .fy-watch-row .fy-input {
+    grid-column: 1 / -1;
+  }
+
+  .fy-toggle-row,
+  .fy-quote-line,
+  .fy-closure-row,
+  .fy-activity-row {
+    align-items: flex-start;
+    flex-wrap: wrap;
   }
 
   .fy-warning-severe,
   .fy-dialog-footer {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .fy-dialog-overlay {
+    padding: 8px;
+  }
+
+  .fy-dialog-content {
+    max-height: calc(100dvh - 16px);
+    padding: 16px;
+    border-radius: 18px;
   }
 
   .fy-player-summary {
@@ -1733,6 +1942,106 @@ body {
 
   .fy-mobile-navigation-item {
     font-size: 0.64rem;
+  }
+}
+
+@media (max-width: 430px) {
+  .fy-app-header {
+    min-height: 140px;
+    gap: 6px;
+    padding: 7px 9px;
+  }
+
+  .fy-main-frame {
+    padding: 156px 8px 126px;
+  }
+
+  .fy-page-title {
+    font-size: 1.12rem;
+  }
+
+  .fy-search-panel {
+    inset-inline: -2px;
+    max-height: calc(100dvh - 168px);
+    border-radius: 18px;
+    padding: 8px;
+  }
+
+  .fy-search-input-shell {
+    gap: 8px;
+    padding-inline: 11px;
+  }
+
+  .fy-search-result {
+    grid-template-columns: 2rem minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .fy-search-result-icon {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .fy-search-result-type,
+  .fy-search-result-shortcut {
+    display: none;
+  }
+
+  .fy-mobile-navigation {
+    right: 6px;
+    bottom: 6px;
+    left: 6px;
+    gap: 3px;
+    padding: 7px;
+  }
+
+  .fy-mobile-navigation-item {
+    min-width: 0;
+    min-height: 36px;
+    padding-inline: 4px;
+    font-size: 0.58rem;
+  }
+
+  .fy-mobile-action-bar {
+    right: 8px;
+    bottom: 64px;
+    left: 8px;
+  }
+
+  .fy-summary-card {
+    min-height: 150px;
+  }
+
+  .fy-data-table {
+    min-width: 540px;
+  }
+
+  .fy-squad-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fy-notification-motion {
+    inset: 146px 6px 98px;
+  }
+
+  .fy-notification-drawer {
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .fy-notification-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .fy-player-summary {
+    grid-template-columns: auto 1fr;
+  }
+
+  .fy-player-summary > strong,
+  .fy-player-summary .fy-badge-delta {
+    grid-column: 2;
+    justify-self: start;
   }
 }
 
