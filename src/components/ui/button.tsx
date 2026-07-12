@@ -6,7 +6,7 @@ import { cn } from '../../lib/utils';
 
 export const buttonVariants = cva(
   [
-    'fy-button group relative isolate inline-flex shrink-0 select-none items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-xl border text-sm font-semibold',
+    'fy-button group relative isolate inline-flex shrink-0 select-none items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-xl border text-sm font-semibold backdrop-blur-xl',
     'transition-[transform,box-shadow,background-color,border-color,color,opacity] duration-200 ease-out',
     'before:pointer-events-none before:absolute before:inset-x-px before:top-px before:-z-10 before:h-1/2 before:rounded-[inherit] before:bg-gradient-to-b before:from-white/35 before:to-transparent before:content-[\'\']',
     'hover:-translate-y-0.5 active:translate-y-px active:scale-[0.985]',

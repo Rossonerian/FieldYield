@@ -15,6 +15,8 @@
   --gold: #ad833c;
   --edge: rgba(39, 77, 62, 0.18);
   --shadow: rgba(38, 61, 51, 0.16);
+  --glass-highlight: rgba(255, 255, 255, 0.48);
+  --glass-blur: 26px;
   --solid-white: #ffffff;
   --solid-black: #101814;
   color: var(--text);
@@ -39,6 +41,8 @@
   --gold: #c59a4d;
   --edge: rgba(203, 229, 218, 0.14);
   --shadow: rgba(0, 0, 0, 0.42);
+  --glass-highlight: rgba(255, 255, 255, 0.16);
+  --glass-blur: 28px;
   --solid-white: #ffffff;
   --solid-black: #101814;
 }
@@ -189,9 +193,9 @@ body {
   gap: 12px;
   padding: 10px 22px;
   border-bottom: 1px solid var(--edge);
-  background: color-mix(in srgb, var(--glass-strong) 92%, transparent);
-  box-shadow: 0 10px 32px color-mix(in srgb, var(--shadow) 28%, transparent);
-  backdrop-filter: blur(22px) saturate(1.12);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--glass-highlight) 44%, transparent), transparent 55%), color-mix(in srgb, var(--glass-strong) 86%, transparent);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 10px 32px color-mix(in srgb, var(--shadow) 28%, transparent);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.14);
 }
 
 .fy-app-header-wordmark {
@@ -276,11 +280,41 @@ body {
   max-height: calc(100dvh - 124px);
 }
 
+.fy-search-input-shell,
+.fy-search-panel,
+.fy-dialog-content,
+.fy-notification-drawer,
+.fy-mobile-navigation {
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 18px 44px color-mix(in srgb, var(--shadow) 38%, transparent);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.12);
+}
+
+.fy-search-input-shell {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--glass-highlight) 34%, transparent), transparent 62%), color-mix(in srgb, var(--teal) 26%, var(--glass));
+}
+
+.fy-search-panel {
+  border-color: color-mix(in srgb, var(--edge) 86%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--glass-highlight) 28%, transparent), transparent 46%), color-mix(in srgb, var(--glass-strong) 88%, transparent);
+}
+
+.fy-search-result {
+  backdrop-filter: blur(12px) saturate(1.08);
+}
+
 /* Cards, titles, and summaries */
 .fy-glass-card {
   min-width: 0;
   padding: 18px;
   overflow: hidden;
+}
+
+.fy-card,
+.fy-glass-card {
+  border-color: color-mix(in srgb, var(--edge) 88%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--glass-highlight) 38%, transparent), transparent 48%), color-mix(in srgb, var(--glass) 90%, transparent);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 16px 38px color-mix(in srgb, var(--shadow) 36%, transparent);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.1);
 }
 
 .fy-section-title {
@@ -1028,7 +1062,7 @@ body {
   padding: 22px;
   border: 1px solid var(--edge);
   border-radius: 20px;
-  background: var(--glass-strong);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--glass-highlight) 28%, transparent), transparent 48%), color-mix(in srgb, var(--glass-strong) 90%, transparent);
   color: var(--text);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34), 0 28px 80px var(--shadow);
   backdrop-filter: blur(24px) saturate(1.1);
@@ -1082,7 +1116,7 @@ body {
   padding: 18px;
   border: 1px solid var(--edge);
   border-radius: 20px;
-  background: var(--glass-strong);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--glass-highlight) 28%, transparent), transparent 48%), color-mix(in srgb, var(--glass-strong) 90%, transparent);
   color: var(--text);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34), 0 24px 64px var(--shadow);
   backdrop-filter: blur(24px) saturate(1.1);
@@ -1158,7 +1192,7 @@ body {
   border-radius: 28px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent), color-mix(in srgb, var(--teal) 30%, var(--glass));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.46), 0 18px 48px var(--shadow), 0 0 36px color-mix(in srgb, var(--teal) 22%, transparent);
-  backdrop-filter: blur(22px) saturate(1.16);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.16);
 }
 
 .fy-desktop-dock-group {
@@ -1223,7 +1257,7 @@ body {
   padding: 7px 9px;
   border: 1px solid var(--edge);
   border-radius: 10px;
-  background: var(--glass-strong);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--glass-highlight) 26%, transparent), transparent 50%), color-mix(in srgb, var(--glass-strong) 90%, transparent);
   color: var(--text);
   box-shadow: 0 10px 24px var(--shadow);
   font-size: 0.72rem;
@@ -1255,6 +1289,10 @@ body {
 }
 
 @media (max-width: 1200px) {
+  .fy-main-frame {
+    padding-inline: 18px;
+  }
+
   .fy-app-header {
     grid-template-columns: 120px minmax(280px, 1fr) auto auto auto;
     padding-inline: 14px;
@@ -1266,6 +1304,10 @@ body {
 
   .fy-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fieldyield-card-carousel {
+    gap: 10px;
   }
 
   .fy-desktop-dock {
@@ -1350,9 +1392,17 @@ body {
     padding: 8px;
     border: 1px solid var(--edge);
     border-radius: 20px;
-    background: var(--glass-strong);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34), 0 14px 36px var(--shadow);
-    backdrop-filter: blur(18px);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--glass-highlight) 28%, transparent), transparent 52%), color-mix(in srgb, var(--glass-strong) 90%, transparent);
+    box-shadow: inset 0 1px 0 var(--glass-highlight), 0 14px 36px color-mix(in srgb, var(--shadow) 45%, transparent);
+    backdrop-filter: blur(var(--glass-blur)) saturate(1.12);
+  }
+
+  .fieldyield-card-carousel {
+    gap: 10px;
+  }
+
+  .fieldyield-card-carousel > div {
+    min-width: 0;
   }
 
   .fy-mobile-navigation-item {
@@ -1473,6 +1523,29 @@ body {
 
   .fy-glass-card {
     padding: 14px;
+  }
+
+  .fy-main-frame {
+    padding-inline: 10px;
+  }
+
+  .fy-search-filters {
+    max-width: calc(100vw - 20px);
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+
+  .fy-search-filters::-webkit-scrollbar {
+    display: none;
+  }
+
+  .fieldyield-card-carousel {
+    gap: 8px;
+  }
+
+  .fieldyield-card-carousel > div {
+    flex-basis: 92%;
   }
 
   .fy-section-title {

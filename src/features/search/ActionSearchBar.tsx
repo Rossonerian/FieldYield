@@ -10,16 +10,19 @@ export const SEARCH_FILTERS = [
   'All',
   'Players',
   'Markets',
-  'Portfolio',
   'Trading',
-  'Commands',
-  'Notifications',
-  'Watchlist',
-  'Settings',
 ] as const;
 
 export type SearchFilter = (typeof SEARCH_FILTERS)[number];
-export type SearchCategory = Exclude<SearchFilter, 'All'>;
+export type SearchCategory =
+  | 'Players'
+  | 'Markets'
+  | 'Portfolio'
+  | 'Trading'
+  | 'Commands'
+  | 'Notifications'
+  | 'Watchlist'
+  | 'Settings';
 export type SearchItemType =
   | 'Player'
   | 'Market'

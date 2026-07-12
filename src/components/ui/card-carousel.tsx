@@ -326,15 +326,16 @@ export function CardCarousel({
                 data-active={isActive ? 'true' : 'false'}
                 inert={!isActive}
                 className="min-w-0 shrink-0 basis-[86%] sm:basis-[70%] md:basis-[58%] lg:basis-[48%] xl:basis-[40%]"
-                animate={
+                animate={{
+                  opacity: isActive ? 1 : 0.7,
+                  scale: isActive ? 1 : 0.975,
+                  filter: isActive ? 'blur(0px)' : 'blur(6px)',
+                }}
+                transition={
                   reduceMotion
-                    ? undefined
-                    : {
-                        opacity: isActive ? 1 : 0.86,
-                        scale: isActive ? 1 : 0.975,
-                      }
+                    ? { duration: 0 }
+                    : { duration: 0.32, ease: 'easeOut' }
                 }
-                transition={{ type: 'spring', stiffness: 340, damping: 34 }}
               >
                 {child}
               </motion.div>
