@@ -177,6 +177,171 @@ body {
   gap: 20px;
 }
 
+.fy-auth-screen {
+  position: relative;
+  display: grid;
+  min-height: 100vh;
+  grid-template-columns: minmax(0, 1.05fr) minmax(360px, 460px);
+  align-items: center;
+  gap: clamp(22px, 5vw, 72px);
+  padding: clamp(22px, 5vw, 72px);
+  overflow: hidden;
+}
+
+.fy-auth-screen::before {
+  position: absolute;
+  inset: 18px;
+  z-index: -1;
+  border: 1px solid color-mix(in srgb, var(--gold) 34%, var(--edge));
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--text) 10%, transparent) 1px, transparent 1px) 0 0 / 34px 34px,
+    repeating-linear-gradient(transparent, transparent 31px, color-mix(in srgb, var(--gold) 14%, transparent) 32px),
+    color-mix(in srgb, var(--solid-white) 70%, var(--canvas));
+  box-shadow: 6px 6px 0 color-mix(in srgb, var(--teal) 18%, transparent), 0 24px 70px color-mix(in srgb, var(--shadow) 34%, transparent);
+  content: "";
+}
+
+.fy-auth-editorial {
+  display: grid;
+  max-width: 760px;
+  gap: 20px;
+}
+
+.fy-auth-kicker {
+  color: color-mix(in srgb, #1a4f8a 78%, var(--teal));
+  font: 800 0.72rem/1 ui-monospace, "SFMono-Regular", Menlo, monospace;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.fy-auth-editorial h1,
+.fy-auth-card h1,
+.fy-auth-card h2 {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.02;
+}
+
+.fy-auth-editorial h1 {
+  max-width: 12ch;
+  font-size: clamp(3rem, 8vw, 7rem);
+  font-weight: 850;
+}
+
+.fy-auth-editorial p {
+  max-width: 58ch;
+  margin: 0;
+  color: var(--muted);
+  font-size: clamp(1rem, 1.5vw, 1.18rem);
+  line-height: 1.7;
+}
+
+.fy-auth-proof-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.fy-auth-proof-grid span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  border: 1px solid color-mix(in srgb, var(--text) 14%, var(--edge));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--solid-white) 58%, transparent);
+  color: var(--text);
+  padding: 8px 11px;
+  font: 700 0.74rem/1.2 ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+
+.fy-auth-card {
+  display: grid;
+  gap: 18px;
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--gold) 34%, var(--edge));
+  border-radius: 6px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--glass-highlight) 34%, transparent), transparent 52%),
+    color-mix(in srgb, var(--glass-strong) 92%, transparent);
+  padding: clamp(20px, 4vw, 32px);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 18px 44px color-mix(in srgb, var(--shadow) 38%, transparent);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.12);
+}
+
+.fy-auth-card-header {
+  display: grid;
+  gap: 8px;
+}
+
+.fy-auth-card h1,
+.fy-auth-card h2 {
+  font-size: clamp(1.7rem, 3.2vw, 2.45rem);
+}
+
+.fy-auth-mode-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--edge);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--teal) 12%, transparent);
+}
+
+.fy-auth-mode-switch button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font: 800 0.76rem/1 ui-monospace, "SFMono-Regular", Menlo, monospace;
+  cursor: pointer;
+}
+
+.fy-auth-mode-switch button[aria-selected="true"] {
+  background: color-mix(in srgb, var(--pink) 84%, var(--text));
+  color: var(--solid-white);
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--pink) 60%, black);
+}
+
+.fy-auth-form {
+  display: grid;
+  gap: 14px;
+}
+
+.fy-auth-form label {
+  display: grid;
+  gap: 7px;
+}
+
+.fy-auth-form label > span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.fy-auth-error {
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--red) 46%, var(--edge));
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--red) 12%, transparent);
+  color: color-mix(in srgb, var(--red) 86%, var(--text));
+  padding: 10px 12px;
+  font-size: 0.84rem;
+}
+
+.fy-auth-submit {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.fy-auth-loading {
+  grid-template-columns: minmax(280px, 480px);
+  justify-content: center;
+}
+
 .fy-markets-screen,
 .fy-portfolio-screen {
   gap: 18px;
@@ -1604,6 +1769,20 @@ body {
 }
 
 @media (max-width: 900px) {
+  .fy-auth-screen {
+    grid-template-columns: 1fr;
+    align-content: center;
+    padding: 22px;
+  }
+
+  .fy-auth-screen::before {
+    inset: 10px;
+  }
+
+  .fy-auth-editorial h1 {
+    max-width: 14ch;
+  }
+
   .fy-screen {
     gap: 16px;
   }
@@ -1868,6 +2047,22 @@ body {
 }
 
 @media (max-width: 620px) {
+  .fy-auth-screen {
+    padding: 16px;
+  }
+
+  .fy-auth-editorial {
+    gap: 14px;
+  }
+
+  .fy-auth-editorial h1 {
+    font-size: 2.55rem;
+  }
+
+  .fy-auth-proof-grid span {
+    width: 100%;
+  }
+
   .fy-screen {
     gap: 14px;
   }

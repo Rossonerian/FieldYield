@@ -4,6 +4,7 @@ import { Header } from '@/components/layout/Header';
 import { DesktopDock } from '@/components/layout/DesktopDock';
 import { MobileNavigation } from '@/components/layout/MobileNavigation';
 import type { NavigationId } from '@/app/navigation';
+import { AuthPage } from '@/features/auth/AuthPage';
 import { AssetPage } from '@/features/assets/AssetPage';
 import { Dashboard } from '@/features/dashboard/Dashboard';
 import { Markets } from '@/features/markets/Markets';
@@ -15,8 +16,14 @@ import { TradingDialogs } from '@/features/trading/TradingDialogs';
 import { Watchlist } from '@/features/watchlist/Watchlist';
 import type { SearchItem } from '@/features/search/ActionSearchBar';
 import { players, type AssetVariant, type ModalName, type Player, type Screen } from '@/data/fieldyield';
+import { fetchCurrentUser, type CurrentUser } from '@/lib/api';
+
+const AUTH_TOKEN_KEY = 'fieldyield.authToken';
 
 export function App() {
+  const [authToken, setAuthToken] = useState<string | null>(() => window.localStorage.getItem(AUTH_TOKEN_KEY));
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(Boolean(authToken));
   const [screen, setScreen] = useState<Screen>('dashboard');
   const [asset, setAsset] = useState<Player>(players[0]);
   const [modal, setModal] = useState<ModalName>(null);
@@ -27,6 +34,36 @@ export function App() {
   const mainRef = useRef<HTMLElement>(null);
   const hasMounted = useRef(false);
   const pageTitle = screen === 'asset' ? asset.name : `${screen.charAt(0).toUpperCase()}${screen.slice(1)}`;
+
+  useEffect(() => {
+    if (!authToken) {
+      setCurrentUser(null);
+      setAuthLoading(false);
+      document.title = 'Login · FieldYield';
+      return;
+    }
+
+    let cancelled = false;
+    setAuthLoading(true);
+    fetchCurrentUser(authToken)
+      .then((user) => {
+        if (!cancelled) setCurrentUser(user);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          window.localStorage.removeItem(AUTH_TOKEN_KEY);
+          setAuthToken(null);
+          setCurrentUser(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setAuthLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authToken]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => setToastVisible(false), 4_000);
@@ -61,6 +98,11 @@ export function App() {
   const openDrawer = useCallback(() => setDrawerOpen(true), []);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
   const closeModal = useCallback(() => setModal(null), []);
+  const handleAuthenticated = useCallback((token: string, user: CurrentUser) => {
+    window.localStorage.setItem(AUTH_TOKEN_KEY, token);
+    setAuthToken(token);
+    setCurrentUser(user);
+  }, []);
 
   const searchItems = useMemo<SearchItem[]>(() => {
     const pageItems: SearchItem[] = [
@@ -111,6 +153,22 @@ export function App() {
 
     return [...pageItems, ...playerItems, ...leagueItems, ...actionItems];
   }, [asset, navigate, openAsset, openBuy, openDrawer]);
+
+  if (authLoading) {
+    return (
+      <main className="fy-auth-screen fy-auth-loading" aria-label="Loading FieldYield">
+        <section className="fy-auth-card">
+          <span className="fy-auth-kicker">FieldYield Exchange</span>
+          <h1>Opening your market notebook...</h1>
+          <p className="fy-muted">Checking your saved session.</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!authToken || !currentUser) {
+    return <AuthPage onAuthenticated={handleAuthenticated} />;
+  }
 
   return (
     <div className="fy-app-shell">
