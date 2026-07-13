@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
@@ -9,8 +9,9 @@ from app.core.config import settings
 from app.core.database import Base, engine, get_db
 from app.core.security import create_access_token
 from app.models import ActiveSquad, Holding, MarketPrice, Notification, Order, Player, User, Wallet, WalletTransaction
-from app.schemas import AgeVerificationIn, CreditIn, LoginIn, OrderIn, RegisterIn, SquadPlayerIn
+from app.schemas import AgeVerificationIn, CreditIn, LoginIn, OrderIn, RegisterIn, SportsFixtureOut, SportsLeagueOut, SportsPlayerOut, SportsTeamOut, SquadPlayerIn
 from app.services import age_ok, authenticate, credit, order, register, seed_players
+from app.sports_data import cleanup_stale_sports_data, fixtures_for_league, get_top_leagues, players_for_team, run_minimal_sync, teams_for_league
 
 @asynccontextmanager
 async def lifespan(app):
@@ -99,11 +100,55 @@ def demote(body: SquadPlayerIn, user: User = Depends(current_user), db: Session 
     if not row: raise HTTPException(404, "Player is not active")
     db.delete(row); db.commit(); return {"status": "inactive"}
 
-@app.get("/api/v1/sports/players")
+@app.get("/api/v1/sports/trading-players")
 def players(db: Session = Depends(get_db)): return db.scalars(select(Player).where(Player.league == "EPL")).all()
+
+@app.get("/api/v1/sports/leagues", response_model=list[SportsLeagueOut])
+def sports_leagues(refresh: bool = False, db: Session = Depends(get_db)):
+    return get_top_leagues(db, refresh=refresh)
+
+@app.get("/api/v1/sports/teams", response_model=list[SportsTeamOut])
+def sports_teams(
+    league: str = Query(default="premier-league"),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    refresh: bool = False,
+    db: Session = Depends(get_db),
+):
+    return teams_for_league(db, league, limit, offset, refresh=refresh)
+
+@app.get("/api/v1/sports/fixtures", response_model=list[SportsFixtureOut])
+def sports_fixtures(
+    league: str = Query(default="premier-league"),
+    date_from: str | None = None,
+    date_to: str | None = None,
+    status: str | None = None,
+    season_id: int | None = None,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    refresh: bool = False,
+    db: Session = Depends(get_db),
+):
+    return fixtures_for_league(db, league, date_from, date_to, status, limit, offset, season_id=season_id, refresh=refresh)
+
+@app.get("/api/v1/sports/provider-players", response_model=list[SportsPlayerOut])
+def sports_players(
+    team_id: int,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    refresh: bool = False,
+    db: Session = Depends(get_db),
+):
+    return players_for_team(db, team_id, limit, offset, refresh=refresh)
 
 @app.post("/api/v1/sports/ingest")
 def ingest(db: Session = Depends(get_db)): seed_players(db); return {"status": "ingested"}
+
+@app.post("/api/v1/sports/sync/top-leagues")
+def sync_top_leagues(db: Session = Depends(get_db)): return run_minimal_sync(db)
+
+@app.post("/api/v1/sports/cleanup")
+def cleanup_sports_data(db: Session = Depends(get_db)): return cleanup_stale_sports_data(db)
 
 @app.get("/api/v1/market/prices")
 def prices(db: Session = Depends(get_db)):

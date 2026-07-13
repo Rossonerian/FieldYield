@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CardTitle, GlassCard, PlayerTable } from '@/components/shared/field-components';
 import { players, type Player } from '@/data/fieldyield';
+import { SportsDataNotebook } from '@/features/markets/SportsDataNotebook';
 
 type MarketsProps = {
   openAsset: (player: Player) => void;
@@ -36,6 +37,7 @@ export function Markets({ openAsset, onBuy }: MarketsProps) {
   return (
     <div className="fy-screen fy-markets-screen">
       <BlurFade><h1 className="fy-page-title">Markets</h1></BlurFade>
+      <BlurFade delay={0.04}><SportsDataNotebook /></BlurFade>
       <BlurFade>
         <GlassCard className="fy-filter-rail">
           <CardTitle title="Browse Markets" />

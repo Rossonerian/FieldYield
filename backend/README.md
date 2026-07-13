@@ -18,10 +18,13 @@ Render setup:
 1. In Render, choose **New > Blueprint**, connect the GitHub repository, and select the root `render.yaml`.
 2. Render creates the API web service, Postgres database, and Key Value instance from the Blueprint.
 3. Enter the Vercel URL for `FRONTEND_URL` when Render prompts for it. Keep the generated `SECRET_KEY` private.
-4. After the API deploys, open the API service shell in Render and run `alembic upgrade head` once to create/update the database tables.
-5. Verify `https://<api-service>.onrender.com/health` returns `{"status":"ok"}`.
-6. Run the frontend separately on Vercel with `VITE_API_BASE_URL` pointed at the Render API URL.
+4. Enter the Bzzoiro token for `BZZOIRO_API_KEY`; the Blueprint keeps it out of source control.
+5. After the API deploys, open the API service shell in Render and run `alembic upgrade head` once to create/update the database tables.
+6. Verify `https://<api-service>.onrender.com/health` returns `{"status":"ok"}`.
+7. Run the frontend separately on Vercel with `VITE_API_BASE_URL` pointed at the Render API URL.
 
 The Blueprint uses only free Render resources for the demo: the API web service, Postgres database, and Key Value instance. Render free web services do not support pre-deploy commands, so database migrations must be run manually from the service shell unless the API is upgraded to a paid plan. Background workers are intentionally omitted because Render does not provide a free worker plan.
+
+Bzzoiro sports data is stored conservatively. PostgreSQL keeps only normalized essentials for the top seven UEFA domestic leagues, teams, fixtures, limited match summaries, and on-demand player profiles. Redis caches short-lived provider responses, reduces repeated requests, and should not be treated as permanent storage. Run `POST /api/v1/sports/sync/top-leagues` to pull the next fixture window, and `POST /api/v1/sports/cleanup` to prune old finished fixtures and stale player cache rows.
 
 Production TODO: move from Render free-tier experiments to paid services before real users, keep Postgres as the source of truth, and add backups/monitoring/retry policies before launch.

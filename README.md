@@ -1,14 +1,15 @@
 # FieldYield
 
-FieldYield is a React frontend for a retro-glass football asset trading experience. It presents dashboards, markets, portfolios, squads, watchlists, trading panels, notifications, and responsive navigation using local frontend data and state.
+FieldYield is a React and FastAPI football-fintech prototype for football asset trading. It presents dashboards, markets, portfolios, squads, watchlists, trading panels, notifications, and responsive navigation, with Bzzoiro sports data flowing through a backend service layer.
 
 ## Current Status
 
-The frontend implementation is complete for the current prototype scope. Backend development has not started. Current data, navigation, theme persistence, trading reviews, and squad/watchlist interactions run in the browser; there is no API, authentication server, database, or server-side business logic. Backend integration is planned separately.
+The frontend remains prototype-led for trading UX, while the backend now supports authentication, wallets, trading seed data, normalized sports data, Redis caching, and Render deployment. Production rollout still needs paid infrastructure, monitoring, backups, and scheduled jobs before real users.
 
 ## Features
 
 - Dashboard summaries and three independent Portfolio, Market, and Activity carousels
+- Bzzoiro-powered top-seven UEFA league notebook in Markets
 - Market filters, sorting, price ranges, and local asset search
 - Portfolio holdings, allocation views, earnings filters, squad management, and watchlist removal
 - Frontend trading panels with click-only Buy/Sell token effects and local review states
@@ -26,11 +27,13 @@ Frontend-only trading reviews deliberately do not change balances or holdings.
 ## Tech Stack
 
 - React 19 and React DOM
+- Vercel Speed Insights
 - Vite 7 with the React plugin
 - TypeScript
 - Tailwind CSS 4 with the Vite plugin
 - Motion 12 (`motion/react`)
 - `lucide-react` and locally installed animated Lucide-compatible registry components
+- FastAPI, SQLAlchemy, Alembic, PostgreSQL, Redis, and Bzzoiro Sports Data
 - `class-variance-authority`, `clsx`, and `tailwind-merge`
 - Radix UI Slot for `Button` composition
 
@@ -79,26 +82,25 @@ The styling system uses Tailwind utilities alongside scoped `fy-*` CSS classes a
 
 FieldYield uses a restrained Retro-Glass visual language: translucent teal surfaces, soft borders, subtle highlights, tactile controls, pink active accents, and intentional light/dark tokens. The desktop dock floats above the page while mobile retains bottom navigation. Interactive controls expose focus states and pressed/checked semantics. Decorative animation is selective and respects `prefers-reduced-motion`.
 
-## Frontend Data
+## Data Layer
 
-The current player, dividend, and activity data lives in [`src/data/fieldyield.ts`](/home/rosso/Projects/FieldYield/src/data/fieldyield.ts). Screen transitions and feature state are held in React state; the theme uses the shared context and localStorage. No values are loaded from an API.
+The current trading demo player, dividend, and activity data still lives in `src/data/fieldyield.ts`. Bzzoiro sports data is loaded through the FastAPI backend, not directly from the browser. PostgreSQL stores only normalized essentials for leagues, teams, fixtures, limited match summaries, and on-demand player profiles. Redis is used for short TTL API response caching and request deduplication protection, not permanent storage.
 
-## Backend Roadmap
+## Backend Notes
 
-These are planned integration areas, not implemented features:
-
-- authentication and user profiles
-- API-backed player, market, portfolio, and squad persistence
-- trading transactions and balances
-- real-time market data
-- server-backed notifications and price alerts
+- Supported Bzzoiro coverage is scoped to Premier League, La Liga, Serie A, Bundesliga, Ligue 1, Eredivisie, and Primeira Liga.
+- Fetches are paginated and scoped by league, season, team, and date window where possible.
+- Run `POST /api/v1/sports/sync/top-leagues` for a minimal fixture/team sync.
+- Run `POST /api/v1/sports/cleanup` to prune old finished fixtures and stale player profile rows.
 
 ## Deployment
 
-- `render.yaml` defines the backend web service and background worker for Render.
+- `render.yaml` defines the backend web service, PostgreSQL database, and Redis-compatible Key Value instance for Render.
 - `vercel.json` pins the frontend build settings for Vercel.
 - Set the backend `FRONTEND_URL` to the Vercel domain so CORS allows browser API calls.
+- Set the backend `BZZOIRO_API_KEY` to your Bzzoiro Sports Data token.
 - Set the frontend `VITE_API_BASE_URL` to the Render API URL once you connect the two.
+- Vercel Speed Insights is installed in the frontend entry point and will report on Vercel deployments.
 - For a demo-only setup, Render's free tiers are fine. For real usage, move the backend resources to paid plans.
 
 ## Development Guidelines

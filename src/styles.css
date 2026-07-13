@@ -182,6 +182,151 @@ body {
   gap: 18px;
 }
 
+.fy-sports-diary {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  border: 1px solid color-mix(in srgb, var(--gold) 34%, var(--edge));
+  border-radius: 6px;
+  background:
+    repeating-linear-gradient(transparent, transparent 27px, color-mix(in srgb, var(--gold) 16%, transparent) 28px),
+    color-mix(in srgb, var(--solid-white) 78%, var(--canvas-accent));
+  box-shadow: 4px 4px 0 color-mix(in srgb, var(--teal) 18%, transparent), 0 18px 40px color-mix(in srgb, var(--shadow) 38%, transparent);
+}
+
+.fy-sports-diary-spine {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 8px;
+  background: color-mix(in srgb, #1a4f8a 82%, var(--teal));
+}
+
+.fy-sports-diary-spine span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--solid-white) 52%, transparent);
+}
+
+.fy-sports-diary-content {
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+}
+
+.fy-sports-diary-header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: start;
+  border-bottom: 2px solid color-mix(in srgb, var(--text) 82%, transparent);
+  padding-bottom: 14px;
+}
+
+.fy-sports-diary-kicker {
+  grid-column: 1 / -1;
+  color: color-mix(in srgb, #1a4f8a 80%, var(--teal));
+  font: 700 0.68rem/1 ui-monospace, "SFMono-Regular", Menlo, monospace;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.fy-sports-diary h2 {
+  margin: 0 0 4px;
+  font-size: 1.2rem;
+  line-height: 1.2;
+}
+
+.fy-sports-diary p,
+.fy-sports-muted {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.fy-sports-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.fy-sports-league-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fy-sports-league-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  border: 1px solid color-mix(in srgb, var(--text) 12%, var(--edge));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--solid-white) 64%, transparent);
+  color: var(--text);
+  padding: 7px 10px;
+  font: 700 0.74rem/1 ui-monospace, "SFMono-Regular", Menlo, monospace;
+  cursor: pointer;
+}
+
+.fy-sports-league-tabs button[aria-selected="true"] {
+  background: color-mix(in srgb, #1a4f8a 88%, var(--teal));
+  color: #f5f0e8;
+}
+
+.fy-sports-diary-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.7fr) minmax(0, 1.3fr);
+  gap: 14px;
+}
+
+.fy-sports-diary-note,
+.fy-sports-fixture-list {
+  display: grid;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--gold) 28%, var(--edge));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--canvas) 54%, var(--solid-white));
+  padding: 14px;
+}
+
+.fy-sports-diary-note span,
+.fy-sports-fixture-title {
+  color: color-mix(in srgb, #1a4f8a 78%, var(--teal));
+  font: 700 0.68rem/1 ui-monospace, "SFMono-Regular", Menlo, monospace;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.fy-sports-diary-note strong {
+  font-size: 1.2rem;
+}
+
+.fy-sports-diary-note small,
+.fy-sports-fixture span,
+.fy-sports-fixture time {
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.fy-sports-fixture-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fy-sports-fixture {
+  display: grid;
+  gap: 3px;
+  border-top: 1px solid color-mix(in srgb, var(--gold) 24%, transparent);
+  padding-top: 8px;
+}
+
 .fy-muted {
   color: var(--muted);
   font-size: 0.78rem;

@@ -107,3 +107,66 @@ class Notification(Base):
     read: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
+
+class SportsLeague(Base):
+    __tablename__ = "sports_leagues"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    provider_id: Mapped[int] = mapped_column(Integer, unique=True, index=True)
+    slug: Mapped[str] = mapped_column(String(40), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(80))
+    country: Mapped[str] = mapped_column(String(60))
+    current_season_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
+
+
+class SportsTeam(Base):
+    __tablename__ = "sports_teams"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    provider_id: Mapped[int] = mapped_column(Integer, unique=True, index=True)
+    league_id: Mapped[int | None] = mapped_column(ForeignKey("sports_leagues.id"), nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    short_name: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    country: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
+
+
+class SportsFixture(Base):
+    __tablename__ = "sports_fixtures"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    provider_id: Mapped[int] = mapped_column(Integer, unique=True, index=True)
+    league_id: Mapped[int] = mapped_column(ForeignKey("sports_leagues.id"), index=True)
+    season_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    home_team_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    away_team_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    home_team: Mapped[str] = mapped_column(String(120))
+    away_team: Mapped[str] = mapped_column(String(120))
+    event_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    status: Mapped[str] = mapped_column(String(30), index=True)
+    home_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    away_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    round_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
+
+
+class SportsPlayer(Base):
+    __tablename__ = "sports_players"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    provider_id: Mapped[int] = mapped_column(Integer, unique=True, index=True)
+    current_team_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    short_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    position: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    nationality: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    market_value_eur: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
+
+
+class SportsSyncRun(Base):
+    __tablename__ = "sports_sync_runs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    scope: Mapped[str] = mapped_column(String(80), index=True)
+    status: Mapped[str] = mapped_column(String(20))
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    message: Mapped[str | None] = mapped_column(Text, nullable=True)
