@@ -93,6 +93,14 @@ These are planned integration areas, not implemented features:
 - real-time market data
 - server-backed notifications and price alerts
 
+## Deployment
+
+- `render.yaml` defines the backend web service and background worker for Render.
+- `vercel.json` pins the frontend build settings for Vercel.
+- Set the backend `FRONTEND_URL` to the Vercel domain so CORS allows browser API calls.
+- Set the frontend `VITE_API_BASE_URL` to the Render API URL once you connect the two.
+- For a demo-only setup, Render's free tiers are fine. For real usage, move the backend resources to paid plans.
+
 ## Development Guidelines
 
 - Reuse the shared UI primitives before creating new components.
