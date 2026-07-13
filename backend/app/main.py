@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import logging
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
@@ -12,6 +13,8 @@ from app.core.security import create_access_token
 from app.models import ActiveSquad, Holding, MarketPrice, Notification, Order, Player, User, Wallet, WalletTransaction, Watchlist
 from app.schemas import AgeVerificationIn, CreditIn, LoginIn, OrderIn, ProfileSummaryOut, ProfileUpdateIn, RegisterIn, SquadPlayerIn, UserProfileOut, WalletOut, WatchlistIn, WatchlistOut
 from app.services import age_ok, authenticate, credit, order, register, seed_players
+
+logger = logging.getLogger("fieldyield.api")
 
 @asynccontextmanager
 async def lifespan(app):
@@ -29,6 +32,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def request_logging_middleware(request: Request, call_next):
+    logger.info("%s %s", request.method, request.url)
+    return await call_next(request)
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(_request: Request, exc: HTTPException):
     return JSONResponse(
@@ -42,6 +50,7 @@ async def http_exception_handler(_request: Request, exc: HTTPException):
 
 @app.exception_handler(Exception)
 async def global_exception_handler(_request: Request, _exc: Exception):
+    logger.exception("Unhandled API exception")
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal Server Error"},
@@ -61,11 +70,17 @@ def register_user(body: RegisterIn, db: Session = Depends(get_db)):
 
 @app.post("/api/v1/auth/login")
 def login(body: LoginIn, db: Session = Depends(get_db)):
-    return {"access_token": create_access_token(str(authenticate(db, body.email, body.password).id)), "token_type": "bearer"}
+    user = authenticate(db, body.email, body.password)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return {"access_token": create_access_token(str(user.id)), "token_type": "bearer"}
 
 @app.post("/api/v1/auth/token")
 def token(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    return {"access_token": create_access_token(str(authenticate(db, form.username, form.password).id)), "token_type": "bearer"}
+    user = authenticate(db, form.username, form.password)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return {"access_token": create_access_token(str(user.id)), "token_type": "bearer"}
 
 @app.get("/api/v1/users/me")
 def me(user: User = Depends(current_user)) -> UserProfileOut:
