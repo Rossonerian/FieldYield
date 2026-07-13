@@ -2,30 +2,60 @@ services:
   - type: web
     name: fieldyield-api
     runtime: docker
+    plan: free
     dockerfilePath: backend/Dockerfile
     dockerContext: backend
+    dockerCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    preDeployCommand: alembic upgrade head
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: fieldyield-db
+          property: connectionString
       - key: REDIS_URL
-        sync: false
+        fromService:
+          type: keyvalue
+          name: fieldyield-redis
+          property: connectionString
       - key: SECRET_KEY
-        sync: false
+        generateValue: true
       - key: FRONTEND_URL
         sync: false
 
   - type: worker
     name: fieldyield-worker
     runtime: docker
+    plan: starter
     dockerfilePath: backend/Dockerfile
     dockerContext: backend
+    dockerCommand: celery -A app.core.celery_app.celery_app worker --loglevel=INFO
     envVars:
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: fieldyield-db
+          property: connectionString
       - key: REDIS_URL
-        sync: false
+        fromService:
+          type: keyvalue
+          name: fieldyield-redis
+          property: connectionString
       - key: SECRET_KEY
-        sync: false
-      - key: FRONTEND_URL
-        sync: false
+        fromService:
+          name: fieldyield-api
+          type: web
+          envVarKey: SECRET_KEY
+
+  - type: keyvalue
+    name: fieldyield-redis
+    plan: free
+    ipAllowList:
+      - source: 0.0.0.0/0
+        description: Render services
+    maxmemoryPolicy: noeviction
+
+databases:
+  - name: fieldyield-db
+    plan: free
+    databaseName: fieldyield
+    user: fieldyield

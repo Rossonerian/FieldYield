@@ -15,10 +15,12 @@ The API is available at `http://localhost:8000`, with OpenAPI docs at `/docs`. R
 
 Render setup:
 
-1. Create a PostgreSQL database and Redis-compatible Key Value instance in the Render dashboard.
-2. Create a Web Service from `render.yaml` using `backend/Dockerfile`.
-3. Create a Background Worker from `render.yaml` using the same image.
-4. Set `DATABASE_URL`, `REDIS_URL`, `SECRET_KEY`, and `FRONTEND_URL` in the Render environment.
+1. In Render, choose **New > Blueprint**, connect the GitHub repository, and select the root `render.yaml`.
+2. Render creates the API web service, Postgres database, Key Value instance, and Celery worker from the Blueprint.
+3. Enter the Vercel URL for `FRONTEND_URL` when Render prompts for it. Keep the generated `SECRET_KEY` private.
+4. After the API deploys, verify `https://<api-service>.onrender.com/health` returns `{"status":"ok"}`.
 5. Run the frontend separately on Vercel with `VITE_API_BASE_URL` pointed at the Render API URL.
+
+The Blueprint uses the free plan for the API, Postgres, and Key Value where Render makes those plans available. Render background workers require a paid `starter` plan, so remove the `fieldyield-worker` entry if this demo does not use Celery jobs yet.
 
 Production TODO: move from Render free-tier experiments to paid services before real users, keep Postgres as the source of truth, and add backups/monitoring/retry policies before launch.
