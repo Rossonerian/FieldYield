@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 os.environ["DATABASE_URL"] = f"sqlite:///{(Path(__file__).resolve().parents[1] / 'test_fieldyield.db').as_posix()}"
-os.environ["FRONTEND_URL"] = "https://your-app.vercel.app"
+os.environ["FRONTEND_URL"] = "https://field-yield.vercel.app"
 from fastapi.testclient import TestClient
 from app.main import app
 from app.core.database import Base, engine

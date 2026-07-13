@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, select
@@ -19,6 +20,7 @@ async def lifespan(app):
     yield
 
 app = FastAPI(title="FieldYield Exchange API", version="1.0.0", lifespan=lifespan)
+print("CORS allowed origin:", settings.frontend_url)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.frontend_url],
@@ -26,6 +28,28 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(_request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers={
+            "Access-Control-Allow-Origin": settings.frontend_url,
+            "Access-Control-Allow-Credentials": "true",
+        },
+    )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(_request: Request, _exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error"},
+        headers={
+            "Access-Control-Allow-Origin": settings.frontend_url,
+            "Access-Control-Allow-Credentials": "true",
+        },
+    )
 
 @app.get("/health")
 def health(): return {"status": "ok"}

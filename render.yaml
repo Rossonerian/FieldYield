@@ -20,7 +20,7 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: FRONTEND_URL
-        sync: false
+        value: https://field-yield.vercel.app
 
   - type: keyvalue
     name: fieldyield-redis

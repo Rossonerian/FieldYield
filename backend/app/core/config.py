@@ -1,13 +1,15 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator
 
+PRODUCTION_FRONTEND_ORIGIN = "https://field-yield.vercel.app"
+
 
 class Settings(BaseSettings):
     database_url: str = "sqlite:///./fieldyield.db"
     redis_url: str = "redis://localhost:6379/0"
     secret_key: str = "change-me-in-development"
     access_token_expire_minutes: int = 60
-    frontend_url: str
+    frontend_url: str = PRODUCTION_FRONTEND_ORIGIN
     signup_bonus_enabled: bool = False
     signup_bonus_gold: int = 100
     signup_bonus_silver: int = 0
@@ -17,12 +19,8 @@ class Settings(BaseSettings):
     @classmethod
     def validate_frontend_url(cls, value: str) -> str:
         normalized = value.rstrip("/")
-        if not normalized.startswith("https://"):
-            raise ValueError("FRONTEND_URL must be the production HTTPS Vercel origin")
-        blocked_hosts = ("localhost", "127.0.0.1", "0.0.0.0")
-        host = normalized.removeprefix("https://").split("/", 1)[0].split(":", 1)[0]
-        if host in blocked_hosts or host.endswith(".local"):
-            raise ValueError("FRONTEND_URL cannot be a local or development origin")
+        if normalized != PRODUCTION_FRONTEND_ORIGIN:
+            raise ValueError(f"FRONTEND_URL must be exactly {PRODUCTION_FRONTEND_ORIGIN}")
         return normalized
 
     @property
