@@ -181,93 +181,77 @@ body {
   position: relative;
   display: grid;
   min-height: 100vh;
-  grid-template-columns: minmax(0, 1.05fr) minmax(360px, 460px);
-  align-items: center;
-  gap: clamp(22px, 5vw, 72px);
-  padding: clamp(22px, 5vw, 72px);
+  place-items: center;
   overflow: hidden;
+  padding: clamp(18px, 5vw, 48px);
+  background:
+    radial-gradient(circle at 18% 18%, rgba(0, 255, 194, 0.38), transparent 29rem),
+    radial-gradient(circle at 82% 16%, rgba(102, 72, 255, 0.5), transparent 30rem),
+    radial-gradient(circle at 58% 86%, rgba(50, 211, 126, 0.38), transparent 26rem),
+    linear-gradient(135deg, #051f4f 0%, #5430b8 44%, #0ba879 100%);
 }
 
-.fy-auth-screen::before {
+.fy-auth-screen::before,
+.fy-auth-screen::after {
   position: absolute;
-  inset: 18px;
-  z-index: -1;
-  border: 1px solid color-mix(in srgb, var(--gold) 34%, var(--edge));
-  border-radius: 8px;
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--text) 10%, transparent) 1px, transparent 1px) 0 0 / 34px 34px,
-    repeating-linear-gradient(transparent, transparent 31px, color-mix(in srgb, var(--gold) 14%, transparent) 32px),
-    color-mix(in srgb, var(--solid-white) 70%, var(--canvas));
-  box-shadow: 6px 6px 0 color-mix(in srgb, var(--teal) 18%, transparent), 0 24px 70px color-mix(in srgb, var(--shadow) 34%, transparent);
+  pointer-events: none;
   content: "";
 }
 
-.fy-auth-editorial {
-  display: grid;
-  max-width: 760px;
-  gap: 20px;
+.fy-auth-screen::before {
+  inset: -20%;
+  background:
+    linear-gradient(115deg, rgba(255, 255, 255, 0.14) 0 1px, transparent 1px 78px),
+    linear-gradient(25deg, rgba(255, 255, 255, 0.12) 0 1px, transparent 1px 96px);
+  mask-image: radial-gradient(circle at center, #000, transparent 72%);
+  animation: fy-auth-drift 18s linear infinite;
 }
 
-.fy-auth-kicker {
-  color: color-mix(in srgb, #1a4f8a 78%, var(--teal));
-  font: 800 0.72rem/1 ui-monospace, "SFMono-Regular", Menlo, monospace;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-
-.fy-auth-editorial h1,
-.fy-auth-card h1,
-.fy-auth-card h2 {
-  margin: 0;
-  color: var(--text);
-  line-height: 1.02;
-}
-
-.fy-auth-editorial h1 {
-  max-width: 12ch;
-  font-size: clamp(3rem, 8vw, 7rem);
-  font-weight: 850;
-}
-
-.fy-auth-editorial p {
-  max-width: 58ch;
-  margin: 0;
-  color: var(--muted);
-  font-size: clamp(1rem, 1.5vw, 1.18rem);
-  line-height: 1.7;
-}
-
-.fy-auth-proof-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.fy-auth-proof-grid span {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 38px;
-  border: 1px solid color-mix(in srgb, var(--text) 14%, var(--edge));
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--solid-white) 58%, transparent);
-  color: var(--text);
-  padding: 8px 11px;
-  font: 700 0.74rem/1.2 ui-monospace, "SFMono-Regular", Menlo, monospace;
+.fy-auth-screen::after {
+  width: min(62rem, 88vw);
+  aspect-ratio: 1;
+  border-radius: 999px;
+  background: conic-gradient(from 90deg, rgba(76, 255, 205, 0.28), rgba(127, 84, 255, 0.32), rgba(80, 210, 126, 0.24), rgba(76, 255, 205, 0.28));
+  filter: blur(36px);
+  opacity: 0.72;
 }
 
 .fy-auth-card {
+  position: relative;
+  z-index: 1;
   display: grid;
-  gap: 18px;
-  width: 100%;
-  border: 1px solid color-mix(in srgb, var(--gold) 34%, var(--edge));
-  border-radius: 6px;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--glass-highlight) 34%, transparent), transparent 52%),
-    color-mix(in srgb, var(--glass-strong) 92%, transparent);
-  padding: clamp(20px, 4vw, 32px);
-  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 18px 44px color-mix(in srgb, var(--shadow) 38%, transparent);
-  backdrop-filter: blur(var(--glass-blur)) saturate(1.12);
+  width: min(100%, 440px);
+  gap: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.18);
+  padding: clamp(22px, 5vw, 34px);
+  color: #ffffff;
+  box-shadow: 0 28px 80px rgba(7, 14, 45, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  backdrop-filter: blur(12px);
+  animation: fy-auth-card-in 520ms ease both;
+}
+
+.fy-auth-brand-row,
+.fy-auth-footnote {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.fy-auth-brand-row {
+  font-weight: 850;
+  letter-spacing: 0.02em;
+}
+
+.fy-auth-brand-mark {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38);
 }
 
 .fy-auth-card-header {
@@ -275,71 +259,221 @@ body {
   gap: 8px;
 }
 
-.fy-auth-card h1,
-.fy-auth-card h2 {
-  font-size: clamp(1.7rem, 3.2vw, 2.45rem);
+.fy-auth-kicker {
+  color: rgba(220, 255, 246, 0.84);
+  font: 800 0.72rem/1 ui-monospace, "SFMono-Regular", Menlo, monospace;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+}
+
+.fy-auth-card h1 {
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(2rem, 9vw, 3rem);
+  line-height: 0.98;
+}
+
+.fy-auth-card p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.76);
+  line-height: 1.55;
 }
 
 .fy-auth-mode-switch {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
-  padding: 5px;
-  border: 1px solid var(--edge);
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--teal) 12%, transparent);
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .fy-auth-mode-switch button {
-  min-height: 38px;
+  min-height: 42px;
   border: 0;
-  border-radius: 4px;
+  border-radius: 999px;
   background: transparent;
-  color: var(--muted);
-  font: 800 0.76rem/1 ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color: rgba(255, 255, 255, 0.72);
+  font-weight: 850;
   cursor: pointer;
+  transition: background-color 220ms ease, color 220ms ease, transform 220ms ease;
 }
 
 .fy-auth-mode-switch button[aria-selected="true"] {
-  background: color-mix(in srgb, var(--pink) 84%, var(--text));
-  color: var(--solid-white);
-  box-shadow: 0 4px 0 color-mix(in srgb, var(--pink) 60%, black);
+  background: rgba(255, 255, 255, 0.88);
+  color: #10306a;
+  box-shadow: 0 12px 28px rgba(9, 23, 72, 0.22);
 }
 
-.fy-auth-form {
+.fy-auth-form,
+.fy-auth-form-panel {
   display: grid;
   gap: 14px;
 }
 
-.fy-auth-form label {
-  display: grid;
-  gap: 7px;
+.fy-auth-form-panel {
+  animation: fy-auth-panel-in 260ms ease both;
 }
 
-.fy-auth-form label > span {
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 750;
+.fy-floating-field {
+  position: relative;
+  display: block;
+}
+
+.fy-floating-field input {
+  width: 100%;
+  min-height: 56px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  padding: 22px 16px 9px;
+  font: inherit;
+  outline: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+}
+
+.fy-floating-field input:focus {
+  border-color: rgba(153, 255, 221, 0.92);
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 0 4px rgba(102, 255, 214, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.26);
+}
+
+.fy-floating-field span {
+  position: absolute;
+  top: 18px;
+  left: 16px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.95rem;
+  pointer-events: none;
+  transform-origin: left top;
+  transition: color 180ms ease, transform 180ms ease;
+}
+
+.fy-floating-field input:focus + span,
+.fy-floating-field input:not(:placeholder-shown) + span {
+  color: rgba(210, 255, 242, 0.96);
+  transform: translateY(-10px) scale(0.76);
+}
+
+.fy-password-strength {
+  display: grid;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.fy-strength-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 0.8rem;
+}
+
+.fy-strength-heading strong {
+  color: #dcfff4;
+}
+
+.fy-strength-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.fy-strength-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ff6b8b, #f9c74f, #52f0b7);
+  transition: width 220ms ease;
+}
+
+.fy-password-strength ul {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fy-password-strength li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.82rem;
+}
+
+.fy-password-strength li.is-met {
+  color: #74ffc8;
 }
 
 .fy-auth-error {
   margin: 0;
-  border: 1px solid color-mix(in srgb, var(--red) 46%, var(--edge));
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--red) 12%, transparent);
-  color: color-mix(in srgb, var(--red) 86%, var(--text));
-  padding: 10px 12px;
-  font-size: 0.84rem;
+  border: 1px solid rgba(255, 148, 170, 0.48);
+  border-radius: 16px;
+  background: rgba(255, 92, 124, 0.16);
+  color: #ffe7ec;
+  padding: 11px 13px;
+  font-size: 0.88rem;
 }
 
 .fy-auth-submit {
+  display: inline-flex;
+  min-height: 54px;
   width: 100%;
-  margin-top: 4px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 0;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #70ffd4, #8d7bff);
+  color: #08205b;
+  font-weight: 900;
+  box-shadow: 0 14px 30px rgba(8, 24, 77, 0.28);
+  cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+}
+
+.fy-auth-submit:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 38px rgba(8, 24, 77, 0.34);
+}
+
+.fy-auth-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+  transform: none;
+}
+
+.fy-auth-footnote {
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.78rem;
 }
 
 .fy-auth-loading {
-  grid-template-columns: minmax(280px, 480px);
-  justify-content: center;
+  color: #ffffff;
+}
+
+@keyframes fy-auth-card-in {
+  from { opacity: 0; transform: translateY(18px) scale(0.98); }
+}
+
+@keyframes fy-auth-panel-in {
+  from { opacity: 0; transform: translateY(10px); }
+}
+
+@keyframes fy-auth-drift {
+  to { transform: translate3d(78px, 42px, 0); }
 }
 
 .fy-markets-screen,
@@ -1770,17 +1904,7 @@ body {
 
 @media (max-width: 900px) {
   .fy-auth-screen {
-    grid-template-columns: 1fr;
-    align-content: center;
-    padding: 22px;
-  }
-
-  .fy-auth-screen::before {
-    inset: 10px;
-  }
-
-  .fy-auth-editorial h1 {
-    max-width: 14ch;
+    padding: 18px;
   }
 
   .fy-screen {
@@ -2048,19 +2172,11 @@ body {
 
 @media (max-width: 620px) {
   .fy-auth-screen {
-    padding: 16px;
+    padding: 14px;
   }
 
-  .fy-auth-editorial {
-    gap: 14px;
-  }
-
-  .fy-auth-editorial h1 {
-    font-size: 2.55rem;
-  }
-
-  .fy-auth-proof-grid span {
-    width: 100%;
+  .fy-auth-card {
+    border-radius: 24px;
   }
 
   .fy-screen {

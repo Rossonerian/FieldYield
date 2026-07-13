@@ -61,11 +61,11 @@ async function apiPost<T>(path: string, body: unknown, token?: string): Promise<
   return response.json() as Promise<T>;
 }
 
-export function registerUser(email: string, password: string, dateOfBirth: string) {
+export function registerUser(email: string, password: string) {
   return apiPost<{ id: number; email: string }>('/api/v1/auth/register', {
     email,
     password,
-    date_of_birth: new Date(dateOfBirth).toISOString(),
+    date_of_birth: new Date('1998-01-01').toISOString(),
   });
 }
 
