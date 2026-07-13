@@ -5,12 +5,12 @@ from app.core.database import Base
 import app.models
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
+config.set_main_option("sqlalchemy.url", settings.sqlalchemy_database_url.replace("%", "%%"))
 # Logging is optional for this local-first migration setup.
 target_metadata = Base.metadata
 
 def run_migrations_offline():
-    context.configure(url=settings.database_url, target_metadata=target_metadata, literal_binds=True)
+    context.configure(url=settings.sqlalchemy_database_url, target_metadata=target_metadata, literal_binds=True)
     with context.begin_transaction(): context.run_migrations()
 
 def run_migrations_online():
