@@ -21,12 +21,6 @@ services:
         generateValue: true
       - key: FRONTEND_URL
         sync: false
-      - key: BZZOIRO_API_KEY
-        sync: false
-      - key: BZZOIRO_BASE_URL
-        value: https://sports.bzzoiro.com
-      - key: BZZOIRO_CACHE_TTL_SECONDS
-        value: 300
 
   - type: keyvalue
     name: fieldyield-redis

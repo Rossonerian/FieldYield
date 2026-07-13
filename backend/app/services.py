@@ -1,10 +1,13 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.core.security import hash_password, verify_password
 from app.models import ActiveSquad, Holding, MarketPrice, Notification, Order, OrderMatch, Player, User, Wallet, WalletTransaction
+
+def now(): return datetime.now(timezone.utc)
 
 SEED_PLAYERS = [("HA9", "Erling Haaland", "Manchester City", Decimal("120.00")), ("SA7", "Bukayo Saka", "Arsenal", Decimal("95.00")), ("WI11", "Florian Wirtz", "Liverpool", Decimal("88.00"))]
 
@@ -19,11 +22,30 @@ def age_ok(dob):
     today = datetime.now(timezone.utc).date(); birth = dob.date()
     return (today.year - birth.year - ((today.month, today.day) < (birth.month, birth.day))) >= 18
 
-def register(db, email, password, dob):
+def register(db, email, password, dob, username=None, first_name=None, last_name=None):
     if db.scalar(select(User).where(User.email == email)): raise HTTPException(409, "Email already registered")
     if not age_ok(dob): raise HTTPException(400, "User must be 18 or older")
-    user = User(email=email, password_hash=hash_password(password), date_of_birth=dob, age_verified=True)
-    db.add(user); db.flush(); db.add(Wallet(user_id=user.id)); db.commit(); db.refresh(user); return user
+    if username and db.scalar(select(User).where(User.username == username.lower())):
+        raise HTTPException(409, "Username already registered")
+    user = User(email=email.lower(), username=username.lower() if username else None, first_name=first_name, last_name=last_name,
+                password_hash=hash_password(password), date_of_birth=dob, age_verified=True)
+    db.add(user); db.flush(); wallet = Wallet(user_id=user.id); db.add(wallet); db.flush()
+    from app.core.config import settings
+    if settings.signup_bonus_enabled and (settings.signup_bonus_gold or settings.signup_bonus_silver):
+        wallet = db.scalar(select(Wallet).where(Wallet.user_id == user.id).with_for_update())
+        if settings.signup_bonus_gold:
+            wallet.gold = settings.signup_bonus_gold
+            db.add(WalletTransaction(user_id=user.id, currency="gold", amount=settings.signup_bonus_gold, reason="signup_bonus", idempotency_key=f"signup_bonus:{user.id}:gold"))
+        if settings.signup_bonus_silver:
+            wallet.silver = settings.signup_bonus_silver
+            db.add(WalletTransaction(user_id=user.id, currency="silver", amount=settings.signup_bonus_silver, reason="signup_bonus", idempotency_key=f"signup_bonus:{user.id}:silver"))
+        user.signup_bonus_awarded_at = now()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "Account details are already registered")
+    db.refresh(user); return user
 
 def authenticate(db, email, password):
     user = db.scalar(select(User).where(User.email == email))
@@ -71,4 +93,3 @@ def order(db, user, side, symbol, quantity, key=None):
     except ValueError as exc:
         order_row.status = "REJECTED"; order_row.failure_reason = str(exc); notify(db, user.id, "order_failed", str(exc))
     db.commit(); db.refresh(order_row); return order_row
-

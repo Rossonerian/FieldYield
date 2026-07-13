@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CardTitle, GlassCard, PlayerTable } from '@/components/shared/field-components';
 import { players, type Player } from '@/data/fieldyield';
-import { SportsDataNotebook } from '@/features/markets/SportsDataNotebook';
 
 type MarketsProps = {
   openAsset: (player: Player) => void;
@@ -26,9 +25,9 @@ export function Markets({ openAsset, onBuy }: MarketsProps) {
     .filter((player) => league === 'All' || player.league === league)
     .filter((player) => position === 'All' || player.position === position)
     .filter((player) => {
-      if (price === '<◈50') return player.price < 50;
-      if (price === '◈50–200') return player.price >= 50 && player.price <= 200;
-      if (price === '>◈200') return player.price > 200;
+      if (price === 'Under 50 Gold') return player.price < 50;
+      if (price === '50-200 Gold') return player.price >= 50 && player.price <= 200;
+      if (price === 'Over 200 Gold') return player.price > 200;
       return true;
     })
     .filter((player) => `${player.name} ${player.ticker} ${player.club}`.toLowerCase().includes(query.trim().toLowerCase()))
@@ -37,7 +36,6 @@ export function Markets({ openAsset, onBuy }: MarketsProps) {
   return (
     <div className="fy-screen fy-markets-screen">
       <BlurFade><h1 className="fy-page-title">Markets</h1></BlurFade>
-      <BlurFade delay={0.04}><SportsDataNotebook /></BlurFade>
       <BlurFade>
         <GlassCard className="fy-filter-rail">
           <CardTitle title="Browse Markets" />
@@ -46,7 +44,7 @@ export function Markets({ openAsset, onBuy }: MarketsProps) {
           <div className="fy-filter-group fy-market-control-strip">
             <Button variant="filter" aria-pressed={descending} onClick={() => setDescending((current) => !current)}><ListFilter /> Sort price {descending ? 'high' : 'low'}</Button>
             <Input aria-label="Search market" placeholder="Search market" value={query} onChange={(event) => setQuery(event.target.value)} />
-            <FilterGroup values={['All', '<◈50', '◈50–200', '>◈200']} value={price} onChange={setPrice} label="Price" inline />
+            <FilterGroup values={['All', 'Under 50 Gold', '50-200 Gold', 'Over 200 Gold']} value={price} onChange={setPrice} label="Price" inline />
           </div>
         </GlassCard>
       </BlurFade>

@@ -1,0 +1,15 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="256" cy="256" r="248" fill="#FFB300"/>
+  <path d="M80 80A248 248 0 0 1 432 80L392 120A192 192 0 0 0 120 120L80 80Z" fill="#FFD331"/>
+  <path d="M432 432A248 248 0 0 1 80 432L120 392A192 192 0 0 0 392 392L432 432Z" fill="#FFD331"/>
+  <circle cx="256" cy="256" r="188" fill="#FB8500"/>
+  <circle cx="253" cy="110" r="12" fill="#FFD331"/>
+  <circle cx="358" cy="151" r="12" fill="#FFD331"/>
+  <circle cx="402" cy="254" r="12" fill="#FFD331"/>
+  <circle cx="361" cy="358" r="12" fill="#FFD331"/>
+  <circle cx="258" cy="403" r="12" fill="#FFD331"/>
+  <circle cx="154" cy="360" r="12" fill="#FFD331"/>
+  <circle cx="110" cy="258" r="12" fill="#FFD331"/>
+  <circle cx="150" cy="154" r="12" fill="#FFD331"/>
+  <path d="M238.5 151.5C246.9 139.5 265.1 139.5 273.5 151.5L340.3 245.9C345.5 253.2 345.5 262.8 340.3 270.1L273.5 364.5C265.1 376.5 246.9 376.5 238.5 364.5L171.7 270.1C166.5 262.8 166.5 253.2 171.7 245.9L238.5 151.5Z" fill="#FFD331"/>
+</svg>

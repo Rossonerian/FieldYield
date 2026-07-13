@@ -5,18 +5,22 @@ import { Badge } from '@/components/ui/badge';
 import { BadgeDelta } from '@/components/ui/badge-delta';
 import { Button } from '@/components/ui/button';
 import { CardCarousel } from '@/components/ui/card-carousel';
+import { CurrencyIcon } from '@/components/ui/currency-icon';
 import { activity, dividends, players, type ModalName, type Player, type Screen } from '@/data/fieldyield';
 import { AssetRow, CardTitle, FeedRow, GlassCard, MiniChart, PlayerTable, RankList } from '@/components/shared/field-components';
 import { AnimatedIcon } from '@/components/ui/animated-icon';
+import { cn } from '@/lib/utils';
+import type { ProfileSummary } from '@/lib/api';
 
 type DashboardProps = {
   openAsset: (player: Player) => void;
   setScreen: (screen: Screen) => void;
   setModal: (modal: ModalName) => void;
   onBuy: (player: Player) => void;
+  summary: ProfileSummary | null;
 };
 
-export function Dashboard({ openAsset, setScreen, setModal, onBuy }: DashboardProps) {
+export function Dashboard({ openAsset, setScreen, setModal, onBuy, summary }: DashboardProps) {
   const [moverFilter, setMoverFilter] = useState('Gainers');
   const [trendFilter, setTrendFilter] = useState('Today');
   const [dividendFilter, setDividendFilter] = useState('Recent');
@@ -38,17 +42,17 @@ export function Dashboard({ openAsset, setScreen, setModal, onBuy }: DashboardPr
       <BlurFade inView>
         <CardCarousel title="Portfolio" ariaLabel="Portfolio summary">
           <GlassCard key="total-value" className="fy-dashboard-card fy-summary-card">
-            <span>Total Value</span><strong className="fy-pixel">◈128,430</strong>
+            <span>Total Value</span><strong className="fy-pixel fy-currency-value"><CurrencyIcon kind="gold" />{summary?.portfolio_market_value?.toFixed(2) ?? '0.00'}</strong>
             <Button onClick={() => setScreen('portfolio')}>View Breakdown</Button>
           </GlassCard>
           <GlassCard key="daily-pl" className="fy-dashboard-card fy-summary-card">
-            <span>Daily P/L</span><strong className="fy-gain">+◈2,184</strong><BadgeDelta value="+3.2%" deltaType="increase" /><MiniChart />
+            <span>Unrealized P/L</span><strong className={cn('fy-currency-value', summary && summary.unrealized_pnl < 0 ? 'fy-loss' : 'fy-gain')}><CurrencyIcon kind="gold" />{summary?.unrealized_pnl?.toFixed(2) ?? '0.00'}</strong><BadgeDelta value={summary ? `${summary.unrealized_pnl.toFixed(2)}` : '0.00'} deltaType={summary ? (summary.unrealized_pnl > 0 ? 'increase' : summary.unrealized_pnl < 0 ? 'decrease' : 'neutral') : 'neutral'} /><MiniChart />
           </GlassCard>
           <GlassCard key="weekly-dividends" className="fy-dashboard-card fy-summary-card">
-            <span>Weekly Dividends</span><strong className="fy-gold">◈1,086</strong><Button onClick={() => setModal('dividend')}>Claim</Button>
+            <span>Wallet Gold</span><strong className="fy-gold fy-currency-value"><CurrencyIcon kind="gold" />{summary?.gold?.toFixed(2) ?? '0.00'}</strong><Button onClick={() => setModal('coins')}>View Wallet</Button>
           </GlassCard>
           <GlassCard key="active-squad" className="fy-dashboard-card fy-summary-card">
-            <span>Active Squad</span><strong>18/25</strong><small>Reserve 8/15</small><Button onClick={() => setScreen('squad')}>Manage</Button>
+            <span>Holdings</span><strong>{summary?.holdings_count ?? 0}</strong><small>{summary?.orders_count ?? 0} orders</small><Button onClick={() => setScreen('portfolio')}>View Portfolio</Button>
           </GlassCard>
         </CardCarousel>
       </BlurFade>

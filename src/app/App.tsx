@@ -14,15 +14,19 @@ import { SettingsPage } from '@/features/settings/SettingsPage';
 import { Squad } from '@/features/squad/Squad';
 import { TradingDialogs } from '@/features/trading/TradingDialogs';
 import { Watchlist } from '@/features/watchlist/Watchlist';
+import { CurrencyIcon } from '@/components/ui/currency-icon';
 import type { SearchItem } from '@/features/search/ActionSearchBar';
 import { players, type AssetVariant, type ModalName, type Player, type Screen } from '@/data/fieldyield';
-import { fetchCurrentUser, type CurrentUser } from '@/lib/api';
+import { fetchCurrentUser, fetchNotifications, fetchProfileSummary, fetchWallet, type CurrentUser, type ProfileSummary, type Wallet } from '@/lib/api';
 
 const AUTH_TOKEN_KEY = 'fieldyield.authToken';
 
 export function App() {
   const [authToken, setAuthToken] = useState<string | null>(() => window.localStorage.getItem(AUTH_TOKEN_KEY));
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [wallet, setWallet] = useState<Wallet | null>(null);
+  const [summary, setSummary] = useState<ProfileSummary | null>(null);
+  const [notificationCount, setNotificationCount] = useState(0);
   const [authLoading, setAuthLoading] = useState(Boolean(authToken));
   const [screen, setScreen] = useState<Screen>('dashboard');
   const [asset, setAsset] = useState<Player>(players[0]);
@@ -30,7 +34,6 @@ export function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [assetState, setAssetState] = useState<AssetVariant>('normal');
   const [tradeSide, setTradeSide] = useState<'buy' | 'sell'>('buy');
-  const [toastVisible, setToastVisible] = useState(true);
   const mainRef = useRef<HTMLElement>(null);
   const hasMounted = useRef(false);
   const pageTitle = screen === 'asset' ? asset.name : `${screen.charAt(0).toUpperCase()}${screen.slice(1)}`;
@@ -66,9 +69,11 @@ export function App() {
   }, [authToken]);
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => setToastVisible(false), 4_000);
-    return () => window.clearTimeout(timeout);
-  }, []);
+    if (!authToken) return;
+    Promise.all([fetchWallet(authToken), fetchProfileSummary(authToken), fetchNotifications(authToken)]).then(([nextWallet, nextSummary, notifications]) => {
+      setWallet(nextWallet); setSummary(nextSummary); setNotificationCount(notifications.filter((entry) => !entry.read).length);
+    }).catch(() => undefined);
+  }, [authToken]);
 
   useEffect(() => {
     document.title = `${pageTitle} · FieldYield`;
@@ -138,11 +143,11 @@ export function App() {
     }));
 
     const actionItems: SearchItem[] = [
-      { id: 'action-buy', title: 'Buy Shares', subtitle: 'Open Buy for the selected asset', type: 'Trading', category: 'Trading', icon: <span aria-hidden="true">◈</span>, section: 'Quick Actions', shortcut: 'B', action: () => openBuy(asset), keywords: ['buy', 'purchase', 'shares', 'trade'] },
+      { id: 'action-buy', title: 'Buy Shares', subtitle: 'Open Buy for the selected asset', type: 'Trading', category: 'Trading', icon: <CurrencyIcon kind="gold" />, section: 'Quick Actions', shortcut: 'B', action: () => openBuy(asset), keywords: ['buy', 'purchase', 'shares', 'trade'] },
       { id: 'action-sell', title: 'Sell Shares', subtitle: 'Open the selected asset trading panel', type: 'Trading', category: 'Trading', icon: <span aria-hidden="true">↗</span>, section: 'Quick Actions', action: () => openAsset(asset, 'normal', 'sell'), keywords: ['sell', 'exit', 'shares', 'trade'] },
       { id: 'action-add-watchlist', title: 'Add to Watchlist', subtitle: 'Open Watchlist management', type: 'Watchlist', category: 'Watchlist', icon: <Star size={18} />, section: 'Quick Actions', action: () => navigate('watchlist'), keywords: ['watch', 'alert', 'track'] },
       { id: 'action-squad', title: 'Manage Squad', subtitle: 'Promote, reserve and inspect squad slots', type: 'Command', category: 'Commands', icon: <Users size={18} />, section: 'Quick Actions', action: () => navigate('squad'), keywords: ['active squad', 'reserve', 'manage'] },
-      { id: 'action-dividends', title: 'Review Dividends', subtitle: 'Open weekly dividend credits', type: 'Portfolio', category: 'Portfolio', icon: <span aria-hidden="true">◈</span>, action: () => { navigate('dashboard'); setModal('dividend'); }, keywords: ['dividend', 'claim', 'earnings', 'weekly'] },
+      { id: 'action-dividends', title: 'Review Dividends', subtitle: 'Open weekly dividend credits', type: 'Portfolio', category: 'Portfolio', icon: <CurrencyIcon kind="gold" />, action: () => { navigate('dashboard'); setModal('dividend'); }, keywords: ['dividend', 'claim', 'earnings', 'weekly'] },
       { id: 'action-holdings', title: 'View Holdings', subtitle: 'Open portfolio holdings table', type: 'Portfolio', category: 'Portfolio', icon: <WalletCards size={18} />, action: () => navigate('portfolio'), keywords: ['holdings', 'positions', 'portfolio'] },
       { id: 'action-notifications', title: 'Notifications', subtitle: 'Open dividend, closure and alert drawer', type: 'Notification', category: 'Notifications', icon: <Megaphone size={18} />, action: openDrawer, keywords: ['bell', 'alerts', 'announcements'] },
       { id: 'action-market-closure', title: 'Market Closure', subtitle: 'Open dashboard league closure countdowns', type: 'Market', category: 'Markets', icon: <Clock size={18} />, action: () => navigate('dashboard'), keywords: ['close', 'locked', 'countdown', 'league'] },
@@ -159,7 +164,7 @@ export function App() {
       <main className="fy-auth-screen fy-auth-loading" aria-label="Loading FieldYield">
         <section className="fy-auth-card">
           <span className="fy-auth-kicker">FieldYield Exchange</span>
-          <h1>Opening your market notebook...</h1>
+          <h1>Opening your FieldYield account...</h1>
           <p className="fy-muted">Checking your saved session.</p>
         </section>
       </main>
@@ -173,21 +178,20 @@ export function App() {
   return (
     <div className="fy-app-shell">
       <a className="fy-skip-link" href="#fy-main-content">Skip to content</a>
-      <Header searchItems={searchItems} onBalance={openBalances} onBell={openDrawer} onBrandClick={() => navigate('dashboard')} onProfile={() => navigate('settings')} notificationCount={4} />
+      <Header searchItems={searchItems} onBalance={openBalances} onBell={openDrawer} onBrandClick={() => navigate('dashboard')} onProfile={() => navigate('settings')} notificationCount={notificationCount} wallet={wallet} user={currentUser} />
       <main id="fy-main-content" ref={mainRef} tabIndex={-1} aria-label={`${pageTitle} page`} className="fy-main-frame">
-        {screen === 'dashboard' && <Dashboard openAsset={openAsset} setScreen={navigate} setModal={setModal} onBuy={openBuy} />}
+        {screen === 'dashboard' && <Dashboard openAsset={openAsset} setScreen={navigate} setModal={setModal} onBuy={openBuy} summary={summary} />}
         {screen === 'asset' && <AssetPage player={asset} variant={assetState} tradeSide={tradeSide} setTradeSide={setTradeSide} setVariant={setAssetState} setModal={setModal} />}
-        {screen === 'portfolio' && <Portfolio openAsset={openAsset} onBuy={openBuy} />}
+        {screen === 'portfolio' && <Portfolio openAsset={openAsset} onBuy={openBuy} summary={summary} />}
         {screen === 'squad' && <Squad setScreen={navigate} />}
         {screen === 'markets' && <Markets openAsset={openAsset} onBuy={openBuy} />}
-        {screen === 'watchlist' && <Watchlist openAsset={openAsset} setScreen={navigate} />}
-        {screen === 'settings' && <SettingsPage />}
+        {screen === 'watchlist' && <Watchlist setScreen={navigate} token={authToken} />}
+        {screen === 'settings' && <SettingsPage token={authToken} user={currentUser} onUpdated={setCurrentUser} />}
       </main>
       <DesktopDock activePage={screen} onNavigate={navigate} />
       <MobileNavigation activePage={screen} onNavigate={navigate} />
-      <NotificationDrawer open={drawerOpen} close={closeDrawer} openAsset={openAsset} />
+      <NotificationDrawer open={drawerOpen} close={closeDrawer} openAsset={openAsset} token={authToken} />
       <TradingDialogs modal={modal} player={asset} close={closeModal} />
-      {toastVisible && <div className="fy-toast" role="status">Market reopened: EPL trading resumed</div>}
     </div>
   );
 }

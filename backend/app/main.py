@@ -2,16 +2,15 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from app.api.deps import current_user, verified_user
 from app.core.config import settings
 from app.core.database import Base, engine, get_db
 from app.core.security import create_access_token
-from app.models import ActiveSquad, Holding, MarketPrice, Notification, Order, Player, User, Wallet, WalletTransaction
-from app.schemas import AgeVerificationIn, CreditIn, LoginIn, OrderIn, RegisterIn, SportsFixtureOut, SportsLeagueOut, SportsPlayerOut, SportsTeamOut, SquadPlayerIn
+from app.models import ActiveSquad, Holding, MarketPrice, Notification, Order, Player, User, Wallet, WalletTransaction, Watchlist
+from app.schemas import AgeVerificationIn, CreditIn, LoginIn, OrderIn, ProfileSummaryOut, ProfileUpdateIn, RegisterIn, SquadPlayerIn, UserProfileOut, WalletOut, WatchlistIn, WatchlistOut
 from app.services import age_ok, authenticate, credit, order, register, seed_players
-from app.sports_data import cleanup_stale_sports_data, fixtures_for_league, get_top_leagues, players_for_team, run_minimal_sync, teams_for_league
 
 @asynccontextmanager
 async def lifespan(app):
@@ -33,7 +32,8 @@ def health(): return {"status": "ok"}
 
 @app.post("/api/v1/auth/register")
 def register_user(body: RegisterIn, db: Session = Depends(get_db)):
-    return {"id": register(db, body.email, body.password, body.date_of_birth).id, "email": body.email}
+    user = register(db, body.email, body.password, body.date_of_birth, body.username, body.first_name, body.last_name)
+    return {"id": user.id, "email": user.email, "signup_bonus_awarded": bool(user.signup_bonus_awarded_at)}
 
 @app.post("/api/v1/auth/login")
 def login(body: LoginIn, db: Session = Depends(get_db)):
@@ -44,7 +44,34 @@ def token(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
     return {"access_token": create_access_token(str(authenticate(db, form.username, form.password).id)), "token_type": "bearer"}
 
 @app.get("/api/v1/users/me")
-def me(user: User = Depends(current_user)): return {"id": user.id, "email": user.email, "age_verified": user.age_verified}
+def me(user: User = Depends(current_user)) -> UserProfileOut:
+    return profile_view(user)
+
+@app.patch("/api/v1/users/me")
+def update_me(body: ProfileUpdateIn, user: User = Depends(current_user), db: Session = Depends(get_db)) -> UserProfileOut:
+    if body.username is not None:
+        normalized = body.username.lower()
+        existing = db.scalar(select(User).where(User.username == normalized, User.id != user.id))
+        if existing: raise HTTPException(409, "Username already registered")
+        user.username = normalized
+    for field in ("first_name", "last_name", "country", "avatar_url", "preferred_currency", "preferences"):
+        value = getattr(body, field)
+        if value is not None: setattr(user, field, value)
+    db.commit(); db.refresh(user); return profile_view(user)
+
+@app.get("/api/v1/users/me/profile")
+def profile(user: User = Depends(current_user)) -> UserProfileOut: return profile_view(user)
+
+@app.get("/api/v1/users/me/summary")
+def profile_summary(user: User = Depends(current_user), db: Session = Depends(get_db)) -> ProfileSummaryOut:
+    wallet = db.scalar(select(Wallet).where(Wallet.user_id == user.id))
+    rows = db.execute(select(Holding, MarketPrice).join(MarketPrice, MarketPrice.player_id == Holding.player_id).where(Holding.user_id == user.id, Holding.quantity > 0)).all()
+    value = sum((holding.quantity * price.bid for holding, price in rows), 0)
+    cost = sum((holding.quantity * holding.average_cost for holding, _ in rows), 0)
+    return ProfileSummaryOut(wallet=WalletOut(gold=float(wallet.gold), silver=float(wallet.silver)), holdings_count=len(rows), portfolio_market_value=float(value), portfolio_cost_basis=float(cost), unrealized_pnl=float(value-cost), realized_pnl=float(sum((holding.realized_pnl for holding, _ in rows), 0)), orders_count=db.scalar(select(func.count(Order.id)).where(Order.user_id == user.id)) or 0, transactions_count=db.scalar(select(func.count(WalletTransaction.id)).where(WalletTransaction.user_id == user.id)) or 0, unread_notifications=db.scalar(select(func.count(Notification.id)).where(Notification.user_id == user.id, Notification.read.is_(False))) or 0)
+
+def profile_view(user: User) -> UserProfileOut:
+    return UserProfileOut(id=user.id, email=user.email, username=user.username, first_name=user.first_name, last_name=user.last_name, country=user.country, avatar_url=user.avatar_url, date_of_birth=user.date_of_birth, age_verified=user.age_verified, created_at=user.created_at, updated_at=user.updated_at or user.created_at, account_status=user.account_status, preferred_currency=user.preferred_currency, preferences=user.preferences or {}, signup_bonus_awarded=bool(user.signup_bonus_awarded_at))
 
 @app.post("/api/v1/users/verify-age")
 def verify_age(body: AgeVerificationIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
@@ -53,15 +80,15 @@ def verify_age(body: AgeVerificationIn, user: User = Depends(current_user), db: 
 
 @app.post("/api/v1/wallet/credit")
 def wallet_credit(body: CreditIn, user: User = Depends(verified_user), db: Session = Depends(get_db)):
-    credit(db, user, body.currency, body.amount, body.idempotency_key); return wallet_view(user, db)
+    credit(db, user, body.currency, body.amount, body.idempotency_key); return wallet_view(user=user, db=db)
 
 @app.get("/api/v1/wallet")
-def wallet_view(user: User = Depends(current_user), db: Session = Depends(get_db)):
-    wallet = db.scalar(select(Wallet).where(Wallet.user_id == user.id)); return {"gold": wallet.gold, "silver": wallet.silver}
+def wallet_view(user: User = Depends(current_user), db: Session = Depends(get_db)) -> WalletOut:
+    wallet = db.scalar(select(Wallet).where(Wallet.user_id == user.id)); return WalletOut(gold=float(wallet.gold), silver=float(wallet.silver))
 
 @app.get("/api/v1/wallet/ledger")
-def ledger(user: User = Depends(current_user), db: Session = Depends(get_db)):
-    return db.scalars(select(WalletTransaction).where(WalletTransaction.user_id == user.id).order_by(WalletTransaction.id.desc())).all()
+def ledger(limit: int = Query(default=50, ge=1, le=200), offset: int = Query(default=0, ge=0), user: User = Depends(current_user), db: Session = Depends(get_db)):
+    return db.scalars(select(WalletTransaction).where(WalletTransaction.user_id == user.id).order_by(WalletTransaction.id.desc()).limit(limit).offset(offset)).all()
 
 @app.post("/api/v1/trading/orders/market-buy")
 def buy(body: OrderIn, user: User = Depends(verified_user), db: Session = Depends(get_db)): return order(db, user, "BUY", body.symbol, body.quantity, body.idempotency_key)
@@ -70,7 +97,7 @@ def buy(body: OrderIn, user: User = Depends(verified_user), db: Session = Depend
 def sell(body: OrderIn, user: User = Depends(verified_user), db: Session = Depends(get_db)): return order(db, user, "SELL", body.symbol, body.quantity, body.idempotency_key)
 
 @app.get("/api/v1/trading/orders")
-def orders(user: User = Depends(current_user), db: Session = Depends(get_db)): return db.scalars(select(Order).where(Order.user_id == user.id).order_by(Order.id.desc())).all()
+def orders(limit: int = Query(default=50, ge=1, le=200), offset: int = Query(default=0, ge=0), user: User = Depends(current_user), db: Session = Depends(get_db)): return db.scalars(select(Order).where(Order.user_id == user.id).order_by(Order.id.desc()).limit(limit).offset(offset)).all()
 
 @app.get("/api/v1/portfolio")
 def portfolio(user: User = Depends(current_user), db: Session = Depends(get_db)):
@@ -103,59 +130,34 @@ def demote(body: SquadPlayerIn, user: User = Depends(current_user), db: Session 
 @app.get("/api/v1/sports/trading-players")
 def players(db: Session = Depends(get_db)): return db.scalars(select(Player).where(Player.league == "EPL")).all()
 
-@app.get("/api/v1/sports/leagues", response_model=list[SportsLeagueOut])
-def sports_leagues(refresh: bool = False, db: Session = Depends(get_db)):
-    return get_top_leagues(db, refresh=refresh)
-
-@app.get("/api/v1/sports/teams", response_model=list[SportsTeamOut])
-def sports_teams(
-    league: str = Query(default="premier-league"),
-    limit: int = Query(default=50, ge=1, le=200),
-    offset: int = Query(default=0, ge=0),
-    refresh: bool = False,
-    db: Session = Depends(get_db),
-):
-    return teams_for_league(db, league, limit, offset, refresh=refresh)
-
-@app.get("/api/v1/sports/fixtures", response_model=list[SportsFixtureOut])
-def sports_fixtures(
-    league: str = Query(default="premier-league"),
-    date_from: str | None = None,
-    date_to: str | None = None,
-    status: str | None = None,
-    season_id: int | None = None,
-    limit: int = Query(default=50, ge=1, le=200),
-    offset: int = Query(default=0, ge=0),
-    refresh: bool = False,
-    db: Session = Depends(get_db),
-):
-    return fixtures_for_league(db, league, date_from, date_to, status, limit, offset, season_id=season_id, refresh=refresh)
-
-@app.get("/api/v1/sports/provider-players", response_model=list[SportsPlayerOut])
-def sports_players(
-    team_id: int,
-    limit: int = Query(default=50, ge=1, le=200),
-    offset: int = Query(default=0, ge=0),
-    refresh: bool = False,
-    db: Session = Depends(get_db),
-):
-    return players_for_team(db, team_id, limit, offset, refresh=refresh)
-
-@app.post("/api/v1/sports/ingest")
-def ingest(db: Session = Depends(get_db)): seed_players(db); return {"status": "ingested"}
-
-@app.post("/api/v1/sports/sync/top-leagues")
-def sync_top_leagues(db: Session = Depends(get_db)): return run_minimal_sync(db)
-
-@app.post("/api/v1/sports/cleanup")
-def cleanup_sports_data(db: Session = Depends(get_db)): return cleanup_stale_sports_data(db)
 
 @app.get("/api/v1/market/prices")
 def prices(db: Session = Depends(get_db)):
     return db.execute(select(Player.symbol, Player.name, MarketPrice.bid, MarketPrice.ask, MarketPrice.updated_at).join(MarketPrice, MarketPrice.player_id == Player.id)).mappings().all()
 
+@app.get("/api/v1/watchlists", response_model=list[WatchlistOut])
+def watchlists(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    rows = db.execute(select(Watchlist, Player, MarketPrice).join(Player, Watchlist.player_id == Player.id).join(MarketPrice, MarketPrice.player_id == Player.id).where(Watchlist.user_id == user.id).order_by(Watchlist.created_at.desc()).limit(200)).all()
+    return [WatchlistOut(id=w.id, symbol=p.symbol, name=p.name, league=p.league, club=p.club, bid=price.bid, ask=price.ask, updated_at=price.updated_at, created_at=w.created_at) for w, p, price in rows]
+
+@app.post("/api/v1/watchlists", response_model=WatchlistOut, status_code=201)
+def add_watchlist(body: WatchlistIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    player = db.scalar(select(Player).where(Player.symbol == body.symbol.upper(), Player.active.is_(True)))
+    if not player: raise HTTPException(404, "Player not found")
+    existing = db.scalar(select(Watchlist).where(Watchlist.user_id == user.id, Watchlist.player_id == player.id))
+    if existing: raise HTTPException(409, "Player is already on your watchlist")
+    row = Watchlist(user_id=user.id, player_id=player.id); db.add(row); db.commit(); db.refresh(row)
+    price = db.scalar(select(MarketPrice).where(MarketPrice.player_id == player.id))
+    return WatchlistOut(id=row.id, symbol=player.symbol, name=player.name, league=player.league, club=player.club, bid=price.bid, ask=price.ask, updated_at=price.updated_at, created_at=row.created_at)
+
+@app.delete("/api/v1/watchlists/{symbol}", status_code=204)
+def remove_watchlist(symbol: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    row = db.scalar(select(Watchlist).join(Player).where(Watchlist.user_id == user.id, Player.symbol == symbol.upper()))
+    if not row: raise HTTPException(404, "Watchlist entry not found")
+    db.delete(row); db.commit()
+
 @app.get("/api/v1/notifications")
-def notifications(user: User = Depends(current_user), db: Session = Depends(get_db)): return db.scalars(select(Notification).where(Notification.user_id == user.id).order_by(Notification.id.desc())).all()
+def notifications(limit: int = Query(default=50, ge=1, le=200), offset: int = Query(default=0, ge=0), user: User = Depends(current_user), db: Session = Depends(get_db)): return db.scalars(select(Notification).where(Notification.user_id == user.id).order_by(Notification.id.desc()).limit(limit).offset(offset)).all()
 
 @app.post("/api/v1/notifications/{notification_id}/read")
 def mark_read(notification_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):

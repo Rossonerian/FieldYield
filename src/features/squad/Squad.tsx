@@ -3,6 +3,7 @@ import { BlurFade } from '@/components/ui/blur-fade';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { CurrencyAmount } from '@/components/ui/currency-icon';
 import { CardTitle, GlassCard } from '@/components/shared/field-components';
 import { HoldAndReleaseButton } from '@/features/trading/HoldAndReleaseButton';
 import { players, type Player, type Screen } from '@/data/fieldyield';
@@ -38,7 +39,10 @@ export function Squad({ setScreen }: { setScreen: (screen: Screen) => void }) {
     <div className="fy-screen">
       <BlurFade><h1 className="fy-page-title">Squad</h1></BlurFade>
       <p className="fy-squad-status" role="status" aria-live="polite">{statusMessage}</p>
-      <BlurFade><GlassCard><CardTitle title="Pre-Season Team Bonds" action={<Button size="sm" variant="secondary">Add Team Bond</Button>} /><div className="fy-team-bonds">{['Arsenal · ◈4,000 · YoY league position', 'Real Madrid · ◈3,500 · YoY league position', 'Add Team Bond'].map((bond) => <div className="fy-bond" key={bond}>{bond}</div>)}</div></GlassCard></BlurFade>
+      <BlurFade><GlassCard><CardTitle title="Pre-Season Team Bonds" action={<Button size="sm" variant="secondary">Add Team Bond</Button>} /><div className="fy-team-bonds">{[
+        { team: 'Arsenal', amount: '4,000', detail: 'YoY league position' },
+        { team: 'Real Madrid', amount: '3,500', detail: 'YoY league position' },
+      ].map((bond) => <div className="fy-bond" key={bond.team}>{bond.team} · <CurrencyAmount>{bond.amount}</CurrencyAmount> · {bond.detail}</div>)}<div className="fy-bond">Add Team Bond</div></div></GlassCard></BlurFade>
       <BlurFade delay={0.08}><GlassCard><CardTitle title={`Active Squad ${activeSlots.length}/25`} /><SquadGrid slots={activeSlots} capacity={25} active actionDisabled={reserveSlots.length >= 15} onReserve={moveToReserve} onEmpty={() => setScreen('markets')} /></GlassCard></BlurFade>
       <BlurFade delay={0.14}><GlassCard><CardTitle title={`Reserve Squad ${reserveSlots.length}/15`} /><SquadGrid slots={reserveSlots} capacity={15} actionDisabled={activeSlots.length >= 25} onActivate={moveToActive} onEmpty={() => setScreen('markets')} /></GlassCard></BlurFade>
     </div>
@@ -51,8 +55,8 @@ function SquadGrid({ slots, capacity, active = false, actionDisabled = false, on
       {slots.map((slot) => (
         <div className="fy-squad-card" key={slot.id}>
           <Avatar name={slot.player.name} fallback={slot.player.photo} showStatus={false} />
-          <strong>{slot.player.ticker}</strong><span>◈{slot.player.price}</span>
-          {active && <Badge variant="warning">◈ Earning</Badge>}
+          <strong>{slot.player.ticker}</strong><span><CurrencyAmount>{slot.player.price}</CurrencyAmount></span>
+          {active && <Badge variant="warning"><CurrencyAmount>Earning</CurrencyAmount></Badge>}
           {active
             ? <HoldAndReleaseButton disabled={actionDisabled} idleLabel={actionDisabled ? 'Reserve Full' : 'Hold to Reserve'} aria-label={`Hold to move ${slot.player.name} to reserve`} onComplete={() => onReserve?.(slot)} />
             : <Button disabled={actionDisabled} size="sm" variant="secondary" onClick={() => onActivate?.(slot)}>{actionDisabled ? 'Active Full' : 'Move to Active'}</Button>}

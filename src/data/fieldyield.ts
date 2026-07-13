@@ -35,15 +35,15 @@ export const players: Player[] = [
 ];
 
 export const activity = [
-  ['14:52', 'Bought 3.0 HA9 at ◈286.4'],
-  ['13:10', 'Dividend credited: JU5 +◈4.28/share'],
+  ['14:52', 'Bought 3.0 HA9 at 286.4 Gold'],
+  ['13:10', 'Dividend credited: JU5 +4.28 Gold/share'],
   ['12:41', 'Added SA7 to watchlist'],
   ['10:05', 'EPL market locks in 02:18:44'],
 ] as const;
 
 export const dividends = [
-  ['GW 22', 'HA9', '◈7.42/share', 'Credited'],
-  ['GW 22', 'JU5', '◈4.28/share', 'Pending'],
-  ['GW 21', 'SA7', '◈3.62/share', 'Credited'],
-  ['GW 21', 'MU42', '◈2.91/share', 'Credited'],
+  ['GW 22', 'HA9', '7.42/share', 'Credited'],
+  ['GW 22', 'JU5', '4.28/share', 'Pending'],
+  ['GW 21', 'SA7', '3.62/share', 'Credited'],
+  ['GW 21', 'MU42', '2.91/share', 'Credited'],
 ] as const;

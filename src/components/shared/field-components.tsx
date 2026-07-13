@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { BadgeDelta, getDeltaType } from '@/components/ui/badge-delta';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { CurrencyAmount } from '@/components/ui/currency-icon';
 import { TradeButton } from '@/features/trading/TradeButton';
 import { cn } from '@/lib/utils';
 
@@ -84,7 +85,7 @@ export function PlayerTable({ entries, openAsset, compact = false, onBuy }: Play
               <td><span className="fy-player-cell"><Avatar name={player.name} fallback={player.photo} size="sm" showStatus={false} decorative />{player.name}</span></td>
               <td>{player.league}</td>
               {!compact && <td>{player.position}</td>}
-              <td>◈{player.price}</td>
+              <td><CurrencyAmount>{player.price}</CurrencyAmount></td>
               <td><BadgeDelta value={`${Math.abs(player.change)}%`} deltaType={getDeltaType(player.change)} /></td>
               {!compact && <td>{player.yield}</td>}
               <td className="fy-row-actions">
@@ -105,7 +106,7 @@ export function AssetRow({ player, openAsset }: { player: Player; openAsset: (pl
     <button type="button" className="fy-asset-row" onClick={() => openAsset(player)}>
       <Avatar name={player.name} fallback={player.photo} size="sm" showStatus={false} decorative />
       <span>{player.ticker}<small>{player.name}</small></span>
-      <strong>◈{player.price}</strong>
+      <strong><CurrencyAmount>{player.price}</CurrencyAmount></strong>
       <BadgeDelta value={`${Math.abs(player.change)}%`} deltaType={getDeltaType(player.change)} />
       <Badge variant={player.status === 'Open' ? 'success' : 'neutral'}>{player.status}</Badge>
     </button>
@@ -120,7 +121,7 @@ export function RankList({ title, items, openAsset }: { title: string; items: Pl
         <button className="fy-rank-row" type="button" key={player.ticker} onClick={() => openAsset(player)}>
           <span>{index + 1}</span>
           <span>{player.name}</span>
-          <strong>◈{player.price}</strong>
+          <strong><CurrencyAmount>{player.price}</CurrencyAmount></strong>
           <BadgeDelta value={`${Math.abs(player.change)}%`} deltaType={getDeltaType(player.change)} />
         </button>
       ))}
@@ -131,7 +132,7 @@ export function RankList({ title, items, openAsset }: { title: string; items: Pl
 export function FeedRow({ row, onClick }: { row: (typeof dividends)[number]; onClick?: () => void }) {
   return (
     <button className="fy-feed-row" type="button" onClick={onClick}>
-      <span>{row[0]}</span><strong>{row[1]}</strong><em>{row[2]}</em>
+      <span>{row[0]}</span><strong>{row[1]}</strong><em><CurrencyAmount>{row[2]}</CurrencyAmount></em>
       <Badge variant={row[3] === 'Pending' ? 'warning' : 'success'}>{row[3]}</Badge>
     </button>
   );
@@ -161,8 +162,8 @@ export function Stats() {
 export function OrderBook() {
   return (
     <div className="fy-depth">
-      <div><h3>Bid</h3>{[286.1, 285.8, 285.4].map((price) => <p key={price}>◈{price} <span>240</span></p>)}</div>
-      <div><h3>Ask</h3>{[286.8, 287.2, 287.6].map((price) => <p key={price}>◈{price} <span>180</span></p>)}</div>
+      <div><h3>Bid</h3>{[286.1, 285.8, 285.4].map((price) => <p key={price}><CurrencyAmount>{price}</CurrencyAmount> <span>240</span></p>)}</div>
+      <div><h3>Ask</h3>{[286.8, 287.2, 287.6].map((price) => <p key={price}><CurrencyAmount>{price}</CurrencyAmount> <span>180</span></p>)}</div>
       <Badge variant="success">Spread 0.7% tight</Badge>
     </div>
   );
@@ -174,7 +175,7 @@ export function DividendTable() {
       <table className="fy-data-table">
         <caption className="fy-sr-only">Dividend history by matchweek with yield and credit status</caption>
         <thead><tr><th>Matchweek</th><th>Dividend/share</th><th>Yield at price</th><th>Status</th><th>Trailing-4-GW</th></tr></thead>
-        <tbody>{dividends.map((row) => <tr key={row.join()}><td>{row[0]}</td><td>{row[2]}</td><td>2.2%</td><td><Badge variant={row[3] === 'Pending' ? 'warning' : 'success'}>{row[3]}</Badge></td><td>◈18.22</td></tr>)}</tbody>
+        <tbody>{dividends.map((row) => <tr key={row.join()}><td>{row[0]}</td><td><CurrencyAmount>{row[2]}</CurrencyAmount></td><td>2.2%</td><td><Badge variant={row[3] === 'Pending' ? 'warning' : 'success'}>{row[3]}</Badge></td><td><CurrencyAmount>18.22</CurrencyAmount></td></tr>)}</tbody>
       </table>
     </div>
   );

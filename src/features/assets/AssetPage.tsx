@@ -5,6 +5,7 @@ import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { BadgeDelta, getDeltaType } from '@/components/ui/badge-delta';
 import { Button } from '@/components/ui/button';
+import { CurrencyAmount } from '@/components/ui/currency-icon';
 import { Input } from '@/components/ui/input';
 import { CardTitle, DividendTable, GlassCard, MiniChart, OrderBook, Stats } from '@/components/shared/field-components';
 import { TradeButton } from '@/features/trading/TradeButton';
@@ -28,8 +29,8 @@ export function AssetPage({ player, variant, tradeSide, setTradeSide, setVariant
       <BlurFade><GlassCard className="fy-asset-header">
         <Avatar name={player.name} fallback={player.photo} size="xl" showStatus={false} decorative />
         <div className="fy-asset-title"><h1>{player.name}</h1><div><Badge>{player.ticker}</Badge> <Badge>{player.league}</Badge> {player.status !== 'Open' && <Badge variant={player.status.includes('Risk') ? 'danger' : 'warning'}>{player.status}</Badge>} {retired && <Badge>RETIRED ★</Badge>}</div></div>
-        <div className="fy-asset-price"><strong className="fy-pixel">◈{player.price.toFixed(2)}</strong><BadgeDelta value={`${Math.abs(player.change)}%`} deltaType={getDeltaType(player.change)} /></div>
-        <div className="fy-mini-stats"><div><span>Mkt Cap</span><strong>◈28.6M</strong></div><div><span>Div. Yield</span><strong>{player.yield}</strong></div><div><span>Supply Owned</span><strong>{player.owned}%</strong></div></div>
+        <div className="fy-asset-price"><strong className="fy-pixel"><CurrencyAmount>{player.price.toFixed(2)}</CurrencyAmount></strong><BadgeDelta value={`${Math.abs(player.change)}%`} deltaType={getDeltaType(player.change)} /></div>
+        <div className="fy-mini-stats"><div><span>Mkt Cap</span><strong><CurrencyAmount>28.6M</CurrencyAmount></strong></div><div><span>Div. Yield</span><strong>{player.yield}</strong></div><div><span>Supply Owned</span><strong>{player.owned}%</strong></div></div>
         {frozen && <div className="fy-warning-banner">Circuit breaker: price dropped 52% in 3 hours. Trading resumes in 11:42.</div>}
         {variant === 'risk' && <div className="fy-warning-banner fy-warning-severe">Nullification final window active. League removal may settle at zero. <TradeButton type="sell" onClick={() => setTradeSide('sell')}>Sell Now →</TradeButton></div>}
       </GlassCard></BlurFade>
@@ -61,9 +62,9 @@ function TradingPanel({ player, side, setSide, setModal }: { player: Player; sid
       <div className="fy-pill-row">{['Market', 'Limit', 'Stop', 'Take Profit'].map((entry, index) => <Button key={entry} variant="filter" size="sm" aria-pressed={order === entry} onClick={() => setOrder(entry)}>{index ? <Lock size={12} /> : null}{entry}</Button>)}</div>
       {order !== 'Market' && <div className="fy-upsell"><Lock size={16} /> {order} orders are available on Pro+. Set target/trigger price after upgrade.</div>}
       <label className="fy-field-label">Shares <Input defaultValue="2.0" inputMode="decimal" /></label>
-      {order !== 'Market' && <label className="fy-field-label">Target / Trigger Price <Input placeholder="◈ target" inputMode="decimal" /></label>}
-      <div className="fy-quote-line"><span>Price/sh</span><strong>◈{player.price}</strong></div>
-      <div className="fy-quote-line"><span>Total</span><strong>◈{(player.price * 2).toFixed(2)}</strong></div>
+      {order !== 'Market' && <label className="fy-field-label">Target / Trigger Price <Input placeholder="Gold target" inputMode="decimal" /></label>}
+      <div className="fy-quote-line"><span>Price/sh</span><strong><CurrencyAmount>{player.price}</CurrencyAmount></strong></div>
+      <div className="fy-quote-line"><span>Total</span><strong><CurrencyAmount>{(player.price * 2).toFixed(2)}</CurrencyAmount></strong></div>
       {side === 'buy'
         ? <TradeButton type="buy" className="fy-trade-review" onClick={() => setModal('buy')}>Review Order →</TradeButton>
         : <TradeButton type="sell" className="fy-trade-review" disabled={sellReviewed} onClick={() => setSellReviewed(true)}>{sellReviewed ? 'Sell Reviewed' : 'Review Sell →'}</TradeButton>}

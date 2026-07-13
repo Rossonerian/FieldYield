@@ -15,6 +15,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -46,6 +47,10 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
         setError('Choose a username to create your account.');
         return;
       }
+      if (!dateOfBirth) {
+        setError('Enter your date of birth to verify eligibility.');
+        return;
+      }
       if (strengthScore < 3) {
         setError('Password must be 8 characters with 1 number and 1 uppercase letter.');
         return;
@@ -56,14 +61,16 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
 
     try {
       if (mode === 'register') {
-        await registerUser(email, password);
+        const registration = await registerUser(email, password, new Date(`${dateOfBirth}T00:00:00Z`).toISOString(), username);
+        if (registration.signup_bonus_awarded) setError('Account created with your signup bonus.');
       }
 
       const token = await loginUser(email, password);
       const user = await fetchCurrentUser(token.access_token);
       onAuthenticated(token.access_token, user);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Authentication failed');
+      const message = caught instanceof Error ? caught.message : '';
+      setError(message.includes('already registered') ? 'An account with these details already exists.' : message.includes('Invalid credentials') ? 'Incorrect email or password.' : message || 'We could not complete authentication. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -105,6 +112,13 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
                   value={username}
                 />
                 <span>Username</span>
+              </label>
+            )}
+
+            {mode === 'register' && (
+              <label className="fy-floating-field">
+                <input autoComplete="bday" name="dateOfBirth" required type="date" value={dateOfBirth} onChange={(event) => setDateOfBirth(event.target.value)} />
+                <span>Date of birth</span>
               </label>
             )}
 
