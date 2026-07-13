@@ -22,29 +22,6 @@ services:
       - key: FRONTEND_URL
         sync: false
 
-  - type: worker
-    name: fieldyield-worker
-    runtime: docker
-    plan: starter
-    dockerfilePath: backend/Dockerfile
-    dockerContext: backend
-    dockerCommand: celery -A app.core.celery_app.celery_app worker --loglevel=INFO
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: fieldyield-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: fieldyield-redis
-          property: connectionString
-      - key: SECRET_KEY
-        fromService:
-          name: fieldyield-api
-          type: web
-          envVarKey: SECRET_KEY
-
   - type: keyvalue
     name: fieldyield-redis
     plan: free
