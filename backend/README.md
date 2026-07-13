@@ -18,9 +18,10 @@ Render setup:
 1. In Render, choose **New > Blueprint**, connect the GitHub repository, and select the root `render.yaml`.
 2. Render creates the API web service, Postgres database, Key Value instance, and Celery worker from the Blueprint.
 3. Enter the Vercel URL for `FRONTEND_URL` when Render prompts for it. Keep the generated `SECRET_KEY` private.
-4. After the API deploys, verify `https://<api-service>.onrender.com/health` returns `{"status":"ok"}`.
-5. Run the frontend separately on Vercel with `VITE_API_BASE_URL` pointed at the Render API URL.
+4. After the API deploys, open the API service shell in Render and run `alembic upgrade head` once to create/update the database tables.
+5. Verify `https://<api-service>.onrender.com/health` returns `{"status":"ok"}`.
+6. Run the frontend separately on Vercel with `VITE_API_BASE_URL` pointed at the Render API URL.
 
-The Blueprint uses the free plan for the API, Postgres, and Key Value where Render makes those plans available. Render background workers require a paid `starter` plan, so remove the `fieldyield-worker` entry if this demo does not use Celery jobs yet.
+The Blueprint uses the free plan for the API, Postgres, and Key Value where Render makes those plans available. Render free web services do not support pre-deploy commands, so database migrations must be run manually from the service shell unless the API is upgraded to a paid plan. Render background workers require a paid `starter` plan, so remove the `fieldyield-worker` entry if this demo does not use Celery jobs yet.
 
 Production TODO: move from Render free-tier experiments to paid services before real users, keep Postgres as the source of truth, and add backups/monitoring/retry policies before launch.
