@@ -34,8 +34,9 @@ app.add_middleware(
 
 @app.middleware("http")
 async def request_logging_middleware(request: Request, call_next):
-    logger.info("%s %s", request.method, request.url)
-    return await call_next(request)
+    response = await call_next(request)
+    logger.info("%s %s -> %s", request.method, request.url, response.status_code)
+    return response
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(_request: Request, exc: HTTPException):
