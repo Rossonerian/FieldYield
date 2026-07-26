@@ -1,23 +1,45 @@
-import { FormEvent, useMemo, useState } from 'react';
-import { ArrowRight, Check, Circle, LockKeyhole, Sparkles } from 'lucide-react';
-import { fetchCurrentUser, loginUser, registerUser, type CurrentUser } from '@/lib/api';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { ArrowRight, Check, Chrome, Circle, LockKeyhole, Sparkles } from 'lucide-react';
+import { fetchCurrentUser, loginUser, registerUser, syncSupabaseUser, type CurrentUser } from '@/lib/api';
+import { clearOAuthUrl, getOAuthRedirectUrl, supabase } from '@/lib/supabase';
 
 type AuthMode = 'login' | 'register';
 
 type AuthPageProps = {
   onAuthenticated: (token: string, user: CurrentUser) => void;
+  requiresSupabaseProfile?: boolean;
 };
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function AuthPage({ onAuthenticated }: AuthPageProps) {
-  const [mode, setMode] = useState<AuthMode>('login');
+export function AuthPage({ onAuthenticated, requiresSupabaseProfile = false }: AuthPageProps) {
+  const [mode, setMode] = useState<AuthMode>(requiresSupabaseProfile ? 'register' : 'login');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!requiresSupabaseProfile || !supabase) return;
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user?.email) setEmail(data.user.email);
+      const metadata = data.user?.user_metadata as { username?: string } | undefined;
+      if (metadata?.username) setUsername(metadata.username);
+    });
+  }, [requiresSupabaseProfile]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const oauthError = params.get('error_description') || hash.get('error_description') || params.get('error') || hash.get('error');
+    if (oauthError) {
+      const normalized = oauthError.toLowerCase();
+      setError(normalized.includes('access_denied') || normalized.includes('access denied') || normalized.includes('cancel') ? 'Google sign-in was cancelled.' : 'Google sign-in could not be completed. Please try again.');
+      if (!window.location.hash.includes('access_token=')) clearOAuthUrl();
+    }
+  }, []);
 
   const passwordRules = useMemo(() => ({
     length: password.length >= 8,
@@ -29,8 +51,24 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
   const strengthLabel = strengthScore === 0 ? 'Empty' : strengthScore === 1 ? 'Weak' : strengthScore === 2 ? 'Good' : 'Strong';
 
   function switchMode(nextMode: AuthMode) {
+    if (requiresSupabaseProfile) return;
     setMode(nextMode);
     setError(null);
+  }
+
+  async function handleGoogleSignIn() {
+    if (!supabase || isSubmitting) return;
+    setError(null);
+    setIsSubmitting(true);
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: getOAuthRedirectUrl(), scopes: 'openid email profile' },
+    });
+    if (oauthError) {
+      const message = oauthError.message.toLowerCase();
+      setError(message.includes('cancel') ? 'Google sign-in was cancelled.' : 'Google sign-in could not be started. Please try again.');
+      setIsSubmitting(false);
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -51,7 +89,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
         setError('Enter your date of birth to verify eligibility.');
         return;
       }
-      if (strengthScore < 3) {
+      if (!requiresSupabaseProfile && strengthScore < 3) {
         setError('Password must be 8 characters with 1 number and 1 uppercase letter.');
         return;
       }
@@ -60,6 +98,41 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
     setIsSubmitting(true);
 
     try {
+      if (supabase && requiresSupabaseProfile) {
+        const { data } = await supabase.auth.getSession();
+        if (!data.session) throw new Error('Your Google session has expired. Please try again.');
+        const user = await syncSupabaseUser(data.session.access_token, { date_of_birth: new Date(`${dateOfBirth}T00:00:00Z`).toISOString(), username });
+        window.localStorage.removeItem('fieldyield.pendingSupabaseProfile');
+        onAuthenticated(data.session.access_token, user);
+        return;
+      }
+      if (supabase) {
+        if (mode === 'register') {
+          const { data, error: signupError } = await supabase.auth.signUp({ email, password, options: { data: { username, date_of_birth: dateOfBirth } } });
+          if (signupError) throw signupError;
+          if (!data.session) { window.localStorage.setItem('fieldyield.pendingSupabaseProfile', JSON.stringify({ date_of_birth: new Date(`${dateOfBirth}T00:00:00Z`).toISOString(), username })); setError('Check your email to confirm the account, then sign in.'); return; }
+          const user = await syncSupabaseUser(data.session.access_token, { date_of_birth: new Date(`${dateOfBirth}T00:00:00Z`).toISOString(), username });
+          window.localStorage.removeItem('fieldyield.pendingSupabaseProfile');
+          onAuthenticated(data.session.access_token, user);
+          return;
+        }
+        const { data, error: signinError } = await supabase.auth.signInWithPassword({ email, password });
+        if (signinError || !data.session) throw signinError ?? new Error('Your session could not be created.');
+        let user: CurrentUser;
+        try {
+          user = await fetchCurrentUser(data.session.access_token);
+        } catch (caught) {
+          const pending = window.localStorage.getItem('fieldyield.pendingSupabaseProfile');
+          let profile: { date_of_birth?: string; username?: string } = {};
+          if (pending) {
+            try { profile = JSON.parse(pending) as { date_of_birth?: string; username?: string }; } catch { profile = {}; }
+          }
+          user = await syncSupabaseUser(data.session.access_token, profile);
+          window.localStorage.removeItem('fieldyield.pendingSupabaseProfile');
+        }
+        onAuthenticated(data.session.access_token, user);
+        return;
+      }
       if (mode === 'register') {
         const registration = await registerUser(email, password, new Date(`${dateOfBirth}T00:00:00Z`).toISOString(), username);
         if (registration.signup_bonus_awarded) setError('Account created with your signup bonus.');
@@ -70,7 +143,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
       onAuthenticated(token.access_token, user);
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : '';
-      setError(message.includes('already registered') ? 'An account with these details already exists.' : message.includes('Invalid credentials') ? 'Incorrect email or password.' : message || 'We could not complete authentication. Please try again.');
+      setError(message.includes('already registered') || message.includes('already exists') ? 'An account with these details already exists.' : message.includes('Invalid credentials') || message.includes('Invalid login') ? 'Incorrect email or password.' : message || 'We could not complete authentication. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -86,18 +159,18 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
 
         <div className="fy-auth-card-header">
           <span className="fy-auth-kicker">In-game football exchange</span>
-          <h1 id="fy-auth-form-title">{mode === 'login' ? 'Welcome back' : 'Create your account'}</h1>
-          <p>{mode === 'login' ? 'Login to continue to the trading dashboard.' : 'Sign up and receive your starter Gold bonus from the backend.'}</p>
+          <h1 id="fy-auth-form-title">{requiresSupabaseProfile ? 'Finish your profile' : mode === 'login' ? 'Welcome back' : 'Create your account'}</h1>
+          <p>{requiresSupabaseProfile ? 'Add your date of birth to finish setting up your Google account.' : mode === 'login' ? 'Login to continue to the trading dashboard.' : 'Sign up and receive your starter Gold bonus from the backend.'}</p>
         </div>
 
-        <div className="fy-auth-mode-switch" role="tablist" aria-label="Authentication mode">
+        {!requiresSupabaseProfile && <div className="fy-auth-mode-switch" role="tablist" aria-label="Authentication mode">
           <button type="button" role="tab" aria-selected={mode === 'login'} onClick={() => switchMode('login')}>
             Login
           </button>
           <button type="button" role="tab" aria-selected={mode === 'register'} onClick={() => switchMode('register')}>
             Sign Up
           </button>
-        </div>
+        </div>}
 
         <form className={`fy-auth-form fy-auth-form-${mode}`} onSubmit={handleSubmit}>
           <div className="fy-auth-form-panel" key={mode}>
@@ -136,7 +209,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
               <span>Email</span>
             </label>
 
-            <label className="fy-floating-field">
+            {!requiresSupabaseProfile && <label className="fy-floating-field">
               <input
                 autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                 name="password"
@@ -147,9 +220,9 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
                 value={password}
               />
               <span>Password</span>
-            </label>
+            </label>}
 
-            {mode === 'register' && (
+            {mode === 'register' && !requiresSupabaseProfile && (
               <div className="fy-password-strength" aria-live="polite">
                 <div className="fy-strength-heading">
                   <span>Password strength</span>
@@ -172,11 +245,18 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
               <span>{isSubmitting ? 'Checking...' : mode === 'login' ? 'Login' : 'Sign Up'}</span>
               <ArrowRight size={18} />
             </button>
+            {!requiresSupabaseProfile && supabase && <>
+              <div className="fy-auth-divider" aria-hidden="true"><span>or</span></div>
+              <button className="fy-google-button" disabled={isSubmitting} type="button" onClick={handleGoogleSignIn}>
+                <Chrome size={18} aria-hidden="true" />
+                <span>{isSubmitting ? 'Redirecting…' : 'Continue with Google'}</span>
+              </button>
+            </>}
           </div>
         </form>
 
         <p className="fy-auth-footnote">
-          <LockKeyhole size={14} /> JWT-secured access. In-game currency only.
+          <LockKeyhole size={14} /> {supabase ? 'Supabase-secured access.' : 'JWT-secured local access.'} In-game currency only.
         </p>
       </section>
     </main>

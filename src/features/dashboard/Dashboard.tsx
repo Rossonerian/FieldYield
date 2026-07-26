@@ -1,16 +1,15 @@
 import { useState } from 'react';
 import { ActivityIcon } from '@/components/ui/activity';
 import { BlurFade } from '@/components/ui/blur-fade';
-import { Badge } from '@/components/ui/badge';
 import { BadgeDelta } from '@/components/ui/badge-delta';
 import { Button } from '@/components/ui/button';
 import { CardCarousel } from '@/components/ui/card-carousel';
 import { CurrencyIcon } from '@/components/ui/currency-icon';
-import { activity, dividends, players, type ModalName, type Player, type Screen } from '@/data/fieldyield';
-import { AssetRow, CardTitle, FeedRow, GlassCard, MiniChart, PlayerTable, RankList } from '@/components/shared/field-components';
+import type { ModalName, Player, Screen } from '@/data/fieldyield';
+import { AssetRow, CardTitle, GlassCard, MiniChart, PlayerTable, RankList } from '@/components/shared/field-components';
 import { AnimatedIcon } from '@/components/ui/animated-icon';
 import { cn } from '@/lib/utils';
-import type { ProfileSummary } from '@/lib/api';
+import type { ProfileSummary, WatchlistEntry } from '@/lib/api';
 
 type DashboardProps = {
   openAsset: (player: Player) => void;
@@ -18,23 +17,16 @@ type DashboardProps = {
   setModal: (modal: ModalName) => void;
   onBuy: (player: Player) => void;
   summary: ProfileSummary | null;
+  players: Player[];
+  watchlist: WatchlistEntry[];
 };
 
-export function Dashboard({ openAsset, setScreen, setModal, onBuy, summary }: DashboardProps) {
-  const [moverFilter, setMoverFilter] = useState('Gainers');
-  const [trendFilter, setTrendFilter] = useState('Today');
+export function Dashboard({ openAsset, setScreen, setModal, onBuy, summary, players, watchlist }: DashboardProps) {
+  const [moverFilter, setMoverFilter] = useState('All');
+  const [trendFilter, setTrendFilter] = useState('All');
   const [dividendFilter, setDividendFilter] = useState('Recent');
-  const moverEntries = moverFilter === 'Losers'
-    ? players.filter((player) => player.change < 0)
-    : moverFilter === 'Volume'
-      ? [...players].sort((left, right) => Number.parseFloat(right.volume) - Number.parseFloat(left.volume)).slice(0, 5)
-      : players.filter((player) => player.change >= 0).slice(0, 5);
-  const trendingPlayers = trendFilter === 'This Gameweek'
-    ? [...players].sort((left, right) => Math.abs(right.change) - Math.abs(left.change))
-    : players;
-  const visibleDividends = dividendFilter === 'Upcoming'
-    ? dividends.filter((row) => row[3] === 'Pending')
-    : dividends;
+  const moverEntries = moverFilter === 'Losers' ? players.filter((player) => (player.change ?? 0) < 0) : moverFilter === 'Gainers' ? players.filter((player) => (player.change ?? 0) > 0) : players;
+  const trendingPlayers = trendFilter === 'All' ? players : players.filter((player) => player.change != null);
 
   return (
     <div className="fy-screen fy-dashboard-screen">
@@ -60,11 +52,11 @@ export function Dashboard({ openAsset, setScreen, setModal, onBuy, summary }: Da
       <BlurFade delay={0.08} inView>
         <CardCarousel title="Market" ariaLabel="Market insights">
           <GlassCard key="market-movers" className="fy-dashboard-card fy-dashboard-card-wide">
-            <CardTitle title="Market Movers" pills={['Gainers', 'Losers', 'Volume']} selectedPill={moverFilter} onPillChange={setMoverFilter} />
+            <CardTitle title="Market Movers" pills={['All', 'Gainers', 'Losers']} selectedPill={moverFilter} onPillChange={setMoverFilter} />
             <PlayerTable entries={moverEntries} openAsset={openAsset} compact onBuy={onBuy} />
           </GlassCard>
           <GlassCard key="trending-assets" className="fy-dashboard-card fy-dashboard-card-wide">
-            <CardTitle title="Trending Assets" pills={['Today', 'This Gameweek']} selectedPill={trendFilter} onPillChange={setTrendFilter} />
+            <CardTitle title="Trending Assets" pills={['All']} selectedPill={trendFilter} onPillChange={setTrendFilter} />
             <div className="fy-two-lists">
               <RankList title="Most Traded" items={trendingPlayers.slice(0, 3)} openAsset={openAsset} />
               <RankList title="Most Added 24h" items={trendingPlayers.slice(2, 5)} openAsset={openAsset} />
@@ -73,9 +65,7 @@ export function Dashboard({ openAsset, setScreen, setModal, onBuy, summary }: Da
           </GlassCard>
           <GlassCard key="market-closure" className="fy-dashboard-card">
             <CardTitle title="Market Closure" />
-            {['EPL', 'La Liga', 'Bundesliga'].map((league, index) => (
-              <div className="fy-closure-row" key={league}><Badge variant={index ? 'neutral' : 'success'}>{index ? 'Locked' : 'Open'}</Badge><span>{league}</span><strong>{index ? '18:42:10' : '02:18:44'}</strong></div>
-            ))}
+            <div className="fy-empty"><strong>Market schedule unavailable</strong><span>Trading availability will appear when the market service publishes a schedule.</span></div>
           </GlassCard>
         </CardCarousel>
       </BlurFade>
@@ -84,15 +74,15 @@ export function Dashboard({ openAsset, setScreen, setModal, onBuy, summary }: Da
         <CardCarousel title="Activity" ariaLabel="Portfolio activity">
           <GlassCard key="watchlist" className="fy-dashboard-card fy-dashboard-scroll-card">
             <CardTitle title="Watchlist" action={<Button size="sm" variant="secondary" onClick={() => setScreen('watchlist')}>View Watchlist</Button>} />
-            {players.slice(0, 5).map((player) => <AssetRow key={player.ticker} player={player} openAsset={openAsset} />)}
+            {watchlist.length ? watchlist.slice(0, 5).map((entry) => <AssetRow key={entry.id} player={{ ticker: entry.symbol, name: entry.name, club: entry.club, league: entry.league, price: Number(entry.ask), change: null, status: 'Open', photo: entry.name.slice(0, 2).toUpperCase() }} openAsset={openAsset} />) : <div className="fy-empty"><strong>No watched players</strong><span>Add assets from Markets to build your watchlist.</span></div>}
           </GlassCard>
           <GlassCard key="dividend-feed" className="fy-dashboard-card">
-            <CardTitle title="Dividend Feed" pills={['Recent', 'Upcoming']} selectedPill={dividendFilter} onPillChange={setDividendFilter} />
-            {visibleDividends.map((row) => <FeedRow key={row.join()} row={row} onClick={() => setModal('dividend')} />)}
+            <CardTitle title="Dividend Feed" pills={['Recent']} selectedPill={dividendFilter} onPillChange={setDividendFilter} />
+            <div className="fy-empty"><strong>No dividend activity yet</strong><span>Credits will appear here after eligible activity is recorded.</span></div>
           </GlassCard>
           <GlassCard key="recent-activity" className="fy-dashboard-card">
             <CardTitle title="Recent Activity" icon={<AnimatedIcon icon={ActivityIcon} size={17} aria-hidden="true" />} />
-            {activity.map(([time, text]) => <div className="fy-activity-row" key={time}><span>{time}</span><strong>{text}</strong></div>)}
+            <div className="fy-empty"><strong>No recent activity</strong><span>Your orders and wallet events will appear here.</span></div>
           </GlassCard>
         </CardCarousel>
       </BlurFade>

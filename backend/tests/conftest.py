@@ -3,14 +3,23 @@ from pathlib import Path
 
 os.environ["DATABASE_URL"] = f"sqlite:///{(Path(__file__).resolve().parents[1] / 'test_fieldyield.db').as_posix()}"
 os.environ["FRONTEND_URL"] = "https://field-yield.vercel.app"
+os.environ["AUTH_PROVIDER"] = "local"
 from fastapi.testclient import TestClient
 from app.main import app
 from app.core.database import Base, engine
+from app.models import MarketPrice, Player
+from decimal import Decimal
+from sqlalchemy.orm import Session
 import pytest
 
 @pytest.fixture()
 def client():
     Base.metadata.drop_all(engine); Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        for symbol, name, price in (("HA9", "Test Player A", Decimal("120.00")), ("SA7", "Test Player B", Decimal("95.00")), ("WI11", "Test Player C", Decimal("88.00"))):
+            player = Player(symbol=symbol, name=name, club="Test Club", league="EPL")
+            db.add(player); db.flush(); db.add(MarketPrice(player_id=player.id, bid=price - 2, ask=price + 2))
+        db.commit()
     with TestClient(app) as c: yield c
     Base.metadata.drop_all(engine)
 

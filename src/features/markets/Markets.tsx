@@ -4,22 +4,22 @@ import { BlurFade } from '@/components/ui/blur-fade';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CardTitle, GlassCard, PlayerTable } from '@/components/shared/field-components';
-import { players, type Player } from '@/data/fieldyield';
+import type { Player } from '@/data/fieldyield';
 
 type MarketsProps = {
   openAsset: (player: Player) => void;
   onBuy: (player: Player) => void;
+  players: Player[];
 };
 
-const leagues = ['All', 'EPL', 'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1', 'Eredivisie', 'Liga Portugal'];
-const positions = ['All', 'GK', 'DEF', 'MID', 'FWD'];
-
-export function Markets({ openAsset, onBuy }: MarketsProps) {
+export function Markets({ openAsset, onBuy, players }: MarketsProps) {
   const [league, setLeague] = useState('All');
   const [position, setPosition] = useState('All');
   const [price, setPrice] = useState('All');
   const [query, setQuery] = useState('');
   const [descending, setDescending] = useState(false);
+  const leagues = ['All', ...new Set(players.map((player) => player.league))];
+  const positions = ['All', ...new Set(players.map((player) => player.position).filter(Boolean) as string[])];
 
   const filteredPlayers = useMemo(() => players
     .filter((player) => league === 'All' || player.league === league)

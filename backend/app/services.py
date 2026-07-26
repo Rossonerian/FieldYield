@@ -1,22 +1,15 @@
 from datetime import datetime, timezone
 from decimal import Decimal
+import secrets
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.core.security import hash_password, verify_password
-from app.models import ActiveSquad, Holding, MarketPrice, Notification, Order, OrderMatch, Player, User, Wallet, WalletTransaction
+from app.core.config import settings
+from app.models import ActiveSquad, Holding, MarketPrice, Notification, Order, OrderMatch, Player, SignupBonusGrant, User, Wallet, WalletTransaction
 
 def now(): return datetime.now(timezone.utc)
-
-SEED_PLAYERS = [("HA9", "Erling Haaland", "Manchester City", Decimal("120.00")), ("SA7", "Bukayo Saka", "Arsenal", Decimal("95.00")), ("WI11", "Florian Wirtz", "Liverpool", Decimal("88.00"))]
-
-def seed_players(db: Session):
-    if db.scalar(select(Player).limit(1)): return
-    for symbol, name, club, price in SEED_PLAYERS:
-        player = Player(symbol=symbol, name=name, club=club, league="EPL")
-        db.add(player); db.flush(); db.add(MarketPrice(player_id=player.id, bid=price - 2, ask=price + 2))
-    db.commit()
 
 def age_ok(dob):
     today = datetime.now(timezone.utc).date(); birth = dob.date()
@@ -28,18 +21,10 @@ def register(db, email, password, dob, username=None, first_name=None, last_name
     if username and db.scalar(select(User).where(User.username == username.lower())):
         raise HTTPException(409, "Username already registered")
     user = User(email=email.lower(), username=username.lower() if username else None, first_name=first_name, last_name=last_name,
+                role="admin" if email.lower() in settings.configured_admin_emails else "user",
                 password_hash=hash_password(password), date_of_birth=dob, age_verified=True)
     db.add(user); db.flush(); wallet = Wallet(user_id=user.id); db.add(wallet); db.flush()
-    from app.core.config import settings
-    if settings.signup_bonus_enabled and (settings.signup_bonus_gold or settings.signup_bonus_silver):
-        wallet = db.scalar(select(Wallet).where(Wallet.user_id == user.id).with_for_update())
-        if settings.signup_bonus_gold:
-            wallet.gold = settings.signup_bonus_gold
-            db.add(WalletTransaction(user_id=user.id, currency="gold", amount=settings.signup_bonus_gold, reason="signup_bonus", idempotency_key=f"signup_bonus:{user.id}:gold"))
-        if settings.signup_bonus_silver:
-            wallet.silver = settings.signup_bonus_silver
-            db.add(WalletTransaction(user_id=user.id, currency="silver", amount=settings.signup_bonus_silver, reason="signup_bonus", idempotency_key=f"signup_bonus:{user.id}:silver"))
-        user.signup_bonus_awarded_at = now()
+    _grant_signup_bonus(db, user, wallet)
     try:
         db.commit()
     except IntegrityError:
@@ -47,9 +32,68 @@ def register(db, email, password, dob, username=None, first_name=None, last_name
         raise HTTPException(409, "Account details are already registered")
     db.refresh(user); return user
 
+def _grant_signup_bonus(db: Session, user: User, wallet: Wallet) -> None:
+    if not settings.signup_bonus_enabled or "test_fieldyield" in settings.database_url or not (settings.signup_bonus_gold or settings.signup_bonus_silver):
+        return
+    wallet = db.scalar(select(Wallet).where(Wallet.user_id == user.id).with_for_update()) or wallet
+    grant_key = f"signup_bonus:{user.id}"
+    if db.scalar(select(SignupBonusGrant).where(SignupBonusGrant.user_id == user.id)):
+        user.signup_bonus_awarded_at = user.signup_bonus_awarded_at or now()
+        return
+    db.add(SignupBonusGrant(user_id=user.id, gold_amount=settings.signup_bonus_gold, silver_amount=settings.signup_bonus_silver, idempotency_key=grant_key))
+    if settings.signup_bonus_gold:
+        wallet.gold += settings.signup_bonus_gold
+        db.add(WalletTransaction(user_id=user.id, currency="gold", amount=settings.signup_bonus_gold, reason="signup_bonus", idempotency_key=f"signup_bonus:{user.id}:gold"))
+    if settings.signup_bonus_silver:
+        wallet.silver += settings.signup_bonus_silver
+        db.add(WalletTransaction(user_id=user.id, currency="silver", amount=settings.signup_bonus_silver, reason="signup_bonus", idempotency_key=f"signup_bonus:{user.id}:silver"))
+    user.signup_bonus_awarded_at = now()
+
+def sync_supabase_user(db: Session, *, provider_id: str, provider: str, email: str, date_of_birth: datetime | None = None, username: str | None = None, first_name: str | None = None, last_name: str | None = None) -> User:
+    if provider not in {"google", "email", "supabase"}:
+        provider = "supabase"
+    existing = db.scalar(select(User).where(User.auth_provider_id == provider_id))
+    if existing:
+        if existing.auth_provider_id and existing.auth_provider_id != provider_id:
+            raise HTTPException(409, "Email is already linked to another identity")
+        existing.auth_provider_id = provider_id
+        existing.auth_provider = provider
+        if db.scalar(select(Wallet).where(Wallet.user_id == existing.id)) is None:
+            db.add(Wallet(user_id=existing.id))
+        if existing.account_status != "active":
+            raise HTTPException(403, "Account is suspended")
+        db.commit(); db.refresh(existing)
+        return existing
+    email_match = db.scalar(select(User).where(User.email == email.lower()))
+    if email_match:
+        raise HTTPException(409, "An account with this email already exists; sign in with its linked provider or link identities in Supabase")
+    if date_of_birth is None:
+        raise HTTPException(400, "Date of birth is required to create your profile")
+    if not age_ok(date_of_birth):
+        raise HTTPException(400, "User must be 18 or older")
+    normalized_username = username.lower() if username else None
+    if normalized_username and db.scalar(select(User).where(User.username == normalized_username)):
+        raise HTTPException(409, "Username already registered")
+    user = User(email=email.lower(), username=normalized_username, first_name=first_name, last_name=last_name, role="admin" if email.lower() in settings.configured_admin_emails else "user", auth_provider=provider, auth_provider_id=provider_id, password_hash=hash_password(secrets.token_urlsafe(32)), date_of_birth=date_of_birth, age_verified=True)
+    db.add(user); db.flush(); wallet = Wallet(user_id=user.id); db.add(wallet); db.flush(); _grant_signup_bonus(db, user, wallet)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        concurrent = db.scalar(select(User).where(User.auth_provider_id == provider_id))
+        if concurrent:
+            return concurrent
+        raise HTTPException(409, "Account identity is already registered") from exc
+    db.refresh(user); return user
+
 def authenticate(db, email, password):
     user = db.scalar(select(User).where(User.email == email))
-    if not user or not verify_password(password, user.password_hash): raise HTTPException(401, "Invalid credentials")
+    try:
+        valid_password = bool(user and verify_password(password, user.password_hash))
+    except (ValueError, TypeError):
+        valid_password = False
+    if not valid_password: raise HTTPException(401, "Invalid credentials")
+    if user.account_status != "active": raise HTTPException(403, "Account is suspended")
     return user
 
 def notify(db, user_id, kind, message): db.add(Notification(user_id=user_id, kind=kind, message=message))

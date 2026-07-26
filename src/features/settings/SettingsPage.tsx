@@ -3,16 +3,19 @@ import { BlurFade } from '@/components/ui/blur-fade';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { GlassCard } from '@/components/shared/field-components';
-import { updateCurrentUser, type CurrentUser } from '@/lib/api';
+import { fetchAdminUsers, updateAdminUserStatus, updateCurrentUser, type AdminUser, type CurrentUser } from '@/lib/api';
 
 const sections = ['Account', 'Subscription', 'Notifications', 'Security', 'Legal & Terms'];
 
-export function SettingsPage({ token, user, onUpdated }: { token: string; user: CurrentUser; onUpdated: (user: CurrentUser) => void }) {
+export function SettingsPage({ token, user, onUpdated, onLogout }: { token: string; user: CurrentUser; onUpdated: (user: CurrentUser) => void; onLogout: () => void }) {
   const [section, setSection] = useState('Account');
   const [form, setForm] = useState({ username: user.username ?? '', first_name: user.first_name ?? '', last_name: user.last_name ?? '', country: user.country ?? '' });
   const [status, setStatus] = useState('');
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [adminError, setAdminError] = useState('');
   useEffect(() => setForm({ username: user.username ?? '', first_name: user.first_name ?? '', last_name: user.last_name ?? '', country: user.country ?? '' }), [user]);
   async function save() { setStatus('Saving…'); try { const payload = { ...form, username: form.username.trim() || undefined, first_name: form.first_name.trim() || undefined, last_name: form.last_name.trim() || undefined, country: form.country.trim() || undefined }; onUpdated(await updateCurrentUser(token, payload)); setStatus('Profile saved.'); } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not save profile.'); } }
+  async function loadAdminUsers() { setAdminError(''); try { setAdminUsers(await fetchAdminUsers(token)); } catch (error) { setAdminError(error instanceof Error ? error.message : 'Could not load users.'); } }
 
   return (
     <div className="fy-screen fy-settings-screen">
@@ -28,13 +31,15 @@ export function SettingsPage({ token, user, onUpdated }: { token: string; user: 
           <label className="fy-field-label">Email <Input type="email" value={user.email} readOnly /></label>
           <p className="fy-muted">Member since {new Date(user.created_at).toLocaleDateString()}</p>
           <p className="fy-muted">Age verification: {user.age_verified ? 'Verified' : 'Required'}</p>
+          <p className="fy-muted">Signup bonus: {user.signup_bonus_awarded ? 'Granted once' : 'Not granted'}</p>
           {status && <p role="status" className="fy-muted">{status}</p>}
-          <Button onClick={save}>Save profile</Button>
+          <Button onClick={save}>Save profile</Button><Button variant="danger" onClick={onLogout}>Sign out</Button>
         </>}
-        {section === 'Notifications' && <p>Notification preferences will appear here when configured for your account.</p>}
+        {section === 'Notifications' && <p>No notification preference records are configured for this account.</p>}
         {section === 'Subscription' && <p>No subscription data is associated with this account.</p>}
         {section === 'Security' && <p>Your account uses server-validated bearer-token authentication.</p>}
         {section === 'Legal & Terms' && <p>Closed-loop virtual currency disclosure · Terms · Privacy · FAQ</p>}
+        {user.role === 'admin' && <div className="fy-admin-panel"><div className="fy-section-title"><h2>Administration</h2><Button size="sm" variant="secondary" onClick={loadAdminUsers}>Refresh users</Button></div>{adminError && <p className="fy-auth-error" role="alert">{adminError}</p>}{adminUsers.length === 0 ? <p className="fy-muted">Load users to review account status and signup bonus state.</p> : <div className="fy-table-wrap"><table className="fy-data-table"><thead><tr><th>User</th><th>Status</th><th>Bonus</th><th>Action</th></tr></thead><tbody>{adminUsers.map((entry) => <tr key={entry.id}><td>{entry.username || entry.email}</td><td>{entry.account_status}</td><td>{entry.signup_bonus_awarded ? 'Granted' : 'Not granted'}</td><td><Button size="sm" variant="filter" onClick={() => updateAdminUserStatus(token, entry.id, entry.account_status === 'active' ? 'suspended' : 'active').then((updated) => setAdminUsers((current) => current.map((item) => item.id === updated.id ? updated : item))).catch((error) => setAdminError(error instanceof Error ? error.message : 'Could not update account.'))}>{entry.account_status === 'active' ? 'Suspend' : 'Restore'}</Button></td></tr>)}</tbody></table></div>}</div>}
       </GlassCard></BlurFade>
     </div>
   );

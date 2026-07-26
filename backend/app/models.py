@@ -20,12 +20,26 @@ class User(Base):
     preferred_currency: Mapped[str] = mapped_column(String(10), default="gold")
     preferences: Mapped[dict] = mapped_column(JSON, default=dict)
     account_status: Mapped[str] = mapped_column(String(16), default="active")
+    role: Mapped[str] = mapped_column(String(16), default="user", index=True)
+    auth_provider: Mapped[str] = mapped_column(String(16), default="local")
+    auth_provider_id: Mapped[str | None] = mapped_column(String(64), unique=True, index=True, nullable=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     date_of_birth: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     age_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
     signup_bonus_awarded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class SignupBonusGrant(Base):
+    __tablename__ = "signup_bonus_grants"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True, index=True)
+    gold_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=0)
+    silver_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=0)
+    reason: Mapped[str] = mapped_column(String(40), default="signup_bonus")
+    idempotency_key: Mapped[str] = mapped_column(String(120), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
 class Player(Base):
@@ -63,6 +77,7 @@ class MarketPrice(Base):
     player_id: Mapped[int] = mapped_column(ForeignKey("players.id"), unique=True)
     bid: Mapped[Decimal] = mapped_column(Numeric(18, 2))
     ask: Mapped[Decimal] = mapped_column(Numeric(18, 2))
+    source: Mapped[str] = mapped_column(String(40), default="manual")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
 
 
@@ -124,3 +139,13 @@ class Watchlist(Base):
     player_id: Mapped[int] = mapped_column(ForeignKey("players.id"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     __table_args__ = (UniqueConstraint("user_id", "player_id"),)
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    actor_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
+    target_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
+    action: Mapped[str] = mapped_column(String(80))
+    details: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, index=True)

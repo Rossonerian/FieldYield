@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChartNoAxesCombined, Clock, Gauge, History, Megaphone, Settings, Shield, ShieldAlert, Star, Trophy, Users, WalletCards } from 'lucide-react';
+import { ChartNoAxesCombined, Clock, Gauge, History, Megaphone, Settings, Star, Trophy, Users, WalletCards } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { DesktopDock } from '@/components/layout/DesktopDock';
 import { MobileNavigation } from '@/components/layout/MobileNavigation';
@@ -16,27 +16,50 @@ import { TradingDialogs } from '@/features/trading/TradingDialogs';
 import { Watchlist } from '@/features/watchlist/Watchlist';
 import { CurrencyIcon } from '@/components/ui/currency-icon';
 import type { SearchItem } from '@/features/search/ActionSearchBar';
-import { players, type AssetVariant, type ModalName, type Player, type Screen } from '@/data/fieldyield';
-import { fetchCurrentUser, fetchNotifications, fetchProfileSummary, fetchWallet, type CurrentUser, type ProfileSummary, type Wallet } from '@/lib/api';
+import { type AssetVariant, type ModalName, type Player, type Screen } from '@/data/fieldyield';
+import { fetchCurrentUser, fetchMarketPlayers, fetchNotifications, fetchProfileSummary, fetchWallet, fetchWatchlist, syncSupabaseUser, type CurrentUser, type ProfileSummary, type Wallet, type WatchlistEntry } from '@/lib/api';
+import { clearOAuthUrl, supabase } from '@/lib/supabase';
 
 const AUTH_TOKEN_KEY = 'fieldyield.authToken';
 
 export function App() {
   const [authToken, setAuthToken] = useState<string | null>(() => window.localStorage.getItem(AUTH_TOKEN_KEY));
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [requiresSupabaseProfile, setRequiresSupabaseProfile] = useState(false);
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [summary, setSummary] = useState<ProfileSummary | null>(null);
   const [notificationCount, setNotificationCount] = useState(0);
   const [authLoading, setAuthLoading] = useState(Boolean(authToken));
   const [screen, setScreen] = useState<Screen>('dashboard');
-  const [asset, setAsset] = useState<Player>(players[0]);
+  const [asset, setAsset] = useState<Player | null>(null);
+  const [marketPlayers, setMarketPlayers] = useState<Player[]>([]);
+  const [watchlist, setWatchlist] = useState<WatchlistEntry[]>([]);
   const [modal, setModal] = useState<ModalName>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [assetState, setAssetState] = useState<AssetVariant>('normal');
   const [tradeSide, setTradeSide] = useState<'buy' | 'sell'>('buy');
   const mainRef = useRef<HTMLElement>(null);
   const hasMounted = useRef(false);
-  const pageTitle = screen === 'asset' ? asset.name : `${screen.charAt(0).toUpperCase()}${screen.slice(1)}`;
+  const pageTitle = screen === 'asset' && asset ? asset.name : `${screen.charAt(0).toUpperCase()}${screen.slice(1)}`;
+
+  useEffect(() => {
+    if (!supabase) return;
+    let active = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (active && data.session) { clearOAuthUrl(); setAuthToken(data.session.access_token); }
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!active) return;
+      if (session) { clearOAuthUrl(); setAuthToken(session.access_token); }
+      if (event === 'SIGNED_OUT') {
+        window.localStorage.removeItem(AUTH_TOKEN_KEY);
+        setCurrentUser(null);
+        setRequiresSupabaseProfile(false);
+        setAuthToken(null);
+      }
+    });
+    return () => { active = false; listener.subscription.unsubscribe(); };
+  }, []);
 
   useEffect(() => {
     if (!authToken) {
@@ -52,11 +75,37 @@ export function App() {
       .then((user) => {
         if (!cancelled) setCurrentUser(user);
       })
-      .catch(() => {
+      .catch(async () => {
+        if (supabase) {
+          try {
+            const { data } = await supabase.auth.getUser();
+            const metadata = data.user?.user_metadata as { date_of_birth?: string; username?: string } | undefined;
+            const pending = window.localStorage.getItem('fieldyield.pendingSupabaseProfile');
+            const stored = pending ? JSON.parse(pending) as { date_of_birth?: string; username?: string } : {};
+            const profile = { date_of_birth: metadata?.date_of_birth ?? stored.date_of_birth, username: metadata?.username ?? stored.username };
+            if (data.user) {
+              const synced = await syncSupabaseUser(authToken, profile);
+              if (!cancelled) {
+                window.localStorage.removeItem('fieldyield.pendingSupabaseProfile');
+                setRequiresSupabaseProfile(false);
+                setCurrentUser(synced);
+                return;
+              }
+            }
+          } catch (syncError) {
+            const message = syncError instanceof Error ? syncError.message : '';
+            if (message.includes('Date of birth is required') && !cancelled) {
+              setRequiresSupabaseProfile(true);
+              return;
+            }
+          }
+        }
         if (!cancelled) {
+          void supabase?.auth.signOut();
           window.localStorage.removeItem(AUTH_TOKEN_KEY);
           setAuthToken(null);
           setCurrentUser(null);
+          setRequiresSupabaseProfile(false);
         }
       })
       .finally(() => {
@@ -70,8 +119,10 @@ export function App() {
 
   useEffect(() => {
     if (!authToken) return;
-    Promise.all([fetchWallet(authToken), fetchProfileSummary(authToken), fetchNotifications(authToken)]).then(([nextWallet, nextSummary, notifications]) => {
+    Promise.all([fetchWallet(authToken), fetchProfileSummary(authToken), fetchNotifications(authToken).catch(() => []), fetchMarketPlayers().catch(() => []), fetchWatchlist(authToken).catch(() => [])]).then(([nextWallet, nextSummary, notifications, nextPlayers, nextWatchlist]) => {
       setWallet(nextWallet); setSummary(nextSummary); setNotificationCount(notifications.filter((entry) => !entry.read).length);
+      setMarketPlayers(nextPlayers.map((entry) => ({ ticker: entry.symbol, name: entry.name, club: entry.club, league: entry.league, price: Number(entry.ask), change: null, volume: null, yield: null, owned: null, status: entry.active ? 'Open' : 'Frozen', photo: entry.name.slice(0, 2).toUpperCase() })));
+      setWatchlist(nextWatchlist);
     }).catch(() => undefined);
   }, [authToken]);
 
@@ -106,7 +157,13 @@ export function App() {
   const handleAuthenticated = useCallback((token: string, user: CurrentUser) => {
     window.localStorage.setItem(AUTH_TOKEN_KEY, token);
     setAuthToken(token);
+    setRequiresSupabaseProfile(false);
     setCurrentUser(user);
+  }, []);
+  const handleLogout = useCallback(() => {
+    void supabase?.auth.signOut();
+    window.localStorage.removeItem(AUTH_TOKEN_KEY);
+    setAuthToken(null); setCurrentUser(null); setWallet(null); setSummary(null); setWatchlist([]); setMarketPlayers([]); setScreen('dashboard');
   }, []);
 
   const searchItems = useMemo<SearchItem[]>(() => {
@@ -119,7 +176,7 @@ export function App() {
       { id: 'page-settings', title: 'Settings', subtitle: 'Account, subscription, notifications and legal', type: 'Settings', category: 'Settings', icon: <Settings size={18} />, action: () => navigate('settings'), keywords: ['account', 'security', 'subscription'] },
     ];
 
-    const leagueItems: SearchItem[] = ['Premier League', 'La Liga', 'Bundesliga', 'Serie A', 'Ligue 1'].map((league) => ({
+    const leagueItems: SearchItem[] = [...new Set(marketPlayers.map((player) => player.league))].map((league) => ({
       id: `league-${league.toLowerCase().replaceAll(' ', '-')}`,
       title: league,
       subtitle: 'Browse league assets in Markets',
@@ -127,10 +184,10 @@ export function App() {
       category: 'Markets',
       icon: <Trophy size={18} />,
       action: () => navigate('markets'),
-      keywords: ['league', 'market', league === 'Premier League' ? 'epl england' : league],
+      keywords: ['league', 'market', league],
     }));
 
-    const playerItems: SearchItem[] = players.map((player, index) => ({
+    const playerItems: SearchItem[] = marketPlayers.map((player, index) => ({
       id: `player-${player.ticker}`,
       title: player.name,
       subtitle: `${player.league} · ${player.ticker} · Open Asset`,
@@ -139,25 +196,25 @@ export function App() {
       icon: <span className="fy-search-player-glyph">⚽</span>,
       section: index < 4 ? 'Most Traded Players' : undefined,
       action: () => openAsset(player, player.status === 'Frozen' ? 'circuit' : 'normal'),
-      keywords: [player.ticker, player.club, player.position, player.league, 'open asset', 'footballer'],
+      keywords: [player.ticker, player.club, player.position ?? '', player.league, 'open asset', 'footballer'],
     }));
 
-    const actionItems: SearchItem[] = [
-      { id: 'action-buy', title: 'Buy Shares', subtitle: 'Open Buy for the selected asset', type: 'Trading', category: 'Trading', icon: <CurrencyIcon kind="gold" />, section: 'Quick Actions', shortcut: 'B', action: () => openBuy(asset), keywords: ['buy', 'purchase', 'shares', 'trade'] },
-      { id: 'action-sell', title: 'Sell Shares', subtitle: 'Open the selected asset trading panel', type: 'Trading', category: 'Trading', icon: <span aria-hidden="true">↗</span>, section: 'Quick Actions', action: () => openAsset(asset, 'normal', 'sell'), keywords: ['sell', 'exit', 'shares', 'trade'] },
+    const actionItems = ([
+      ...(asset ? [
+        { id: 'action-buy', title: 'Buy Shares', subtitle: 'Open Buy for the selected asset', type: 'Trading', category: 'Trading', icon: <CurrencyIcon kind="gold" />, section: 'Quick Actions', shortcut: 'B', action: () => openBuy(asset), keywords: ['buy', 'purchase', 'shares', 'trade'] },
+        { id: 'action-sell', title: 'Sell Shares', subtitle: 'Open the selected asset trading panel', type: 'Trading', category: 'Trading', icon: <span aria-hidden="true">↗</span>, section: 'Quick Actions', action: () => openAsset(asset, 'normal', 'sell'), keywords: ['sell', 'exit', 'shares', 'trade'] },
+      ] : []),
       { id: 'action-add-watchlist', title: 'Add to Watchlist', subtitle: 'Open Watchlist management', type: 'Watchlist', category: 'Watchlist', icon: <Star size={18} />, section: 'Quick Actions', action: () => navigate('watchlist'), keywords: ['watch', 'alert', 'track'] },
       { id: 'action-squad', title: 'Manage Squad', subtitle: 'Promote, reserve and inspect squad slots', type: 'Command', category: 'Commands', icon: <Users size={18} />, section: 'Quick Actions', action: () => navigate('squad'), keywords: ['active squad', 'reserve', 'manage'] },
       { id: 'action-dividends', title: 'Review Dividends', subtitle: 'Open weekly dividend credits', type: 'Portfolio', category: 'Portfolio', icon: <CurrencyIcon kind="gold" />, action: () => { navigate('dashboard'); setModal('dividend'); }, keywords: ['dividend', 'claim', 'earnings', 'weekly'] },
       { id: 'action-holdings', title: 'View Holdings', subtitle: 'Open portfolio holdings table', type: 'Portfolio', category: 'Portfolio', icon: <WalletCards size={18} />, action: () => navigate('portfolio'), keywords: ['holdings', 'positions', 'portfolio'] },
       { id: 'action-notifications', title: 'Notifications', subtitle: 'Open dividend, closure and alert drawer', type: 'Notification', category: 'Notifications', icon: <Megaphone size={18} />, action: openDrawer, keywords: ['bell', 'alerts', 'announcements'] },
       { id: 'action-market-closure', title: 'Market Closure', subtitle: 'Open dashboard league closure countdowns', type: 'Market', category: 'Markets', icon: <Clock size={18} />, action: () => navigate('dashboard'), keywords: ['close', 'locked', 'countdown', 'league'] },
-      { id: 'action-dividend-history', title: 'Dividend History', subtitle: 'Open asset dividend history table', type: 'Portfolio', category: 'Portfolio', icon: <History size={18} />, action: () => openAsset(asset), keywords: ['dividends', 'history', 'earnings'] },
-      { id: 'action-circuit-breakers', title: 'Circuit Breakers', subtitle: 'Inspect frozen assets and risk events', type: 'Notification', category: 'Notifications', icon: <ShieldAlert size={18} />, action: () => openAsset(players[4], 'circuit'), keywords: ['frozen', 'halted', 'breaker', 'risk'] },
-      { id: 'action-split-queue', title: 'Split Queue', subtitle: 'Open assets with split releases queued', type: 'Trading', category: 'Trading', icon: <Shield size={18} />, action: () => openAsset(players[1]), keywords: ['split', 'queued', 'locked shares'] },
-    ];
+      ...(asset ? [{ id: 'action-dividend-history', title: 'Dividend History', subtitle: 'Open asset dividend history table', type: 'Portfolio', category: 'Portfolio', icon: <History size={18} />, action: () => openAsset(asset), keywords: ['dividends', 'history', 'earnings'] }] : []),
+    ] as SearchItem[]);
 
     return [...pageItems, ...playerItems, ...leagueItems, ...actionItems];
-  }, [asset, navigate, openAsset, openBuy, openDrawer]);
+  }, [asset, marketPlayers, navigate, openAsset, openBuy, openDrawer]);
 
   if (authLoading) {
     return (
@@ -172,7 +229,7 @@ export function App() {
   }
 
   if (!authToken || !currentUser) {
-    return <AuthPage onAuthenticated={handleAuthenticated} />;
+    return <AuthPage onAuthenticated={handleAuthenticated} requiresSupabaseProfile={requiresSupabaseProfile} />;
   }
 
   return (
@@ -180,18 +237,18 @@ export function App() {
       <a className="fy-skip-link" href="#fy-main-content">Skip to content</a>
       <Header searchItems={searchItems} onBalance={openBalances} onBell={openDrawer} onBrandClick={() => navigate('dashboard')} onProfile={() => navigate('settings')} notificationCount={notificationCount} wallet={wallet} user={currentUser} />
       <main id="fy-main-content" ref={mainRef} tabIndex={-1} aria-label={`${pageTitle} page`} className="fy-main-frame">
-        {screen === 'dashboard' && <Dashboard openAsset={openAsset} setScreen={navigate} setModal={setModal} onBuy={openBuy} summary={summary} />}
-        {screen === 'asset' && <AssetPage player={asset} variant={assetState} tradeSide={tradeSide} setTradeSide={setTradeSide} setVariant={setAssetState} setModal={setModal} />}
+        {screen === 'dashboard' && <Dashboard openAsset={openAsset} setScreen={navigate} setModal={setModal} onBuy={openBuy} summary={summary} players={marketPlayers} watchlist={watchlist} />}
+        {screen === 'asset' && asset && <AssetPage player={asset} variant={assetState} tradeSide={tradeSide} setTradeSide={setTradeSide} setVariant={setAssetState} setModal={setModal} />}
         {screen === 'portfolio' && <Portfolio openAsset={openAsset} onBuy={openBuy} summary={summary} />}
-        {screen === 'squad' && <Squad setScreen={navigate} />}
-        {screen === 'markets' && <Markets openAsset={openAsset} onBuy={openBuy} />}
+        {screen === 'squad' && <Squad setScreen={navigate} token={authToken} players={marketPlayers} />}
+        {screen === 'markets' && <Markets openAsset={openAsset} onBuy={openBuy} players={marketPlayers} />}
         {screen === 'watchlist' && <Watchlist setScreen={navigate} token={authToken} />}
-        {screen === 'settings' && <SettingsPage token={authToken} user={currentUser} onUpdated={setCurrentUser} />}
+        {screen === 'settings' && <SettingsPage token={authToken} user={currentUser} onUpdated={setCurrentUser} onLogout={handleLogout} />}
       </main>
       <DesktopDock activePage={screen} onNavigate={navigate} />
       <MobileNavigation activePage={screen} onNavigate={navigate} />
-      <NotificationDrawer open={drawerOpen} close={closeDrawer} openAsset={openAsset} token={authToken} />
-      <TradingDialogs modal={modal} player={asset} close={closeModal} />
+      <NotificationDrawer open={drawerOpen} close={closeDrawer} token={authToken} />
+      {asset && <TradingDialogs modal={modal} player={asset} close={closeModal} token={authToken} />}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -6,43 +6,41 @@ import { Button } from '@/components/ui/button';
 import { CurrencyAmount } from '@/components/ui/currency-icon';
 import { CardTitle, GlassCard } from '@/components/shared/field-components';
 import { HoldAndReleaseButton } from '@/features/trading/HoldAndReleaseButton';
-import { players, type Player, type Screen } from '@/data/fieldyield';
+import type { Player, Screen } from '@/data/fieldyield';
+import { demoteSquad, fetchSquad, promoteSquad } from '@/lib/api';
 
 type SquadSlot = { id: string; player: Player };
 
-function createSlots(prefix: string, count: number, offset = 0): SquadSlot[] {
-  return Array.from({ length: count }, (_, index) => ({ id: `${prefix}-${index}`, player: players[(index + offset) % players.length] }));
-}
-
-export function Squad({ setScreen }: { setScreen: (screen: Screen) => void }) {
-  const initialActive = useMemo(() => createSlots('active', 18), []);
-  const initialReserve = useMemo(() => createSlots('reserve', 8, 2), []);
-  const [activeSlots, setActiveSlots] = useState(initialActive);
-  const [reserveSlots, setReserveSlots] = useState(initialReserve);
+export function Squad({ setScreen, token, players }: { setScreen: (screen: Screen) => void; token: string; players: Player[] }) {
+  const [activeSlots, setActiveSlots] = useState<SquadSlot[]>([]);
+  const [reserveSlots, setReserveSlots] = useState<SquadSlot[]>([]);
   const [statusMessage, setStatusMessage] = useState('');
+  const [error, setError] = useState('');
+  useEffect(() => {
+    fetchSquad(token).then((entries) => {
+      const mapped = entries.flatMap((entry) => {
+        const player = players.find((candidate) => candidate.ticker === entry.symbol);
+        return player ? [{ id: String(entry.id), player }] : [];
+      });
+      setActiveSlots(mapped);
+    }).catch(() => setError('Could not load your squad.'));
+  }, [players, token]);
 
   const moveToReserve = (slot: SquadSlot) => {
     if (reserveSlots.length >= 15) return;
-    setActiveSlots((current) => current.filter((entry) => entry.id !== slot.id));
-    setReserveSlots((current) => [...current, { ...slot, id: `reserve-${slot.id}` }]);
-    setStatusMessage(`${slot.player.name} moved to Reserve.`);
+    demoteSquad(token, slot.player.ticker).then(() => { setActiveSlots((current) => current.filter((entry) => entry.id !== slot.id)); setReserveSlots((current) => [...current, { ...slot, id: `reserve-${slot.id}` }]); setStatusMessage(`${slot.player.name} moved to Reserve.`); }).catch((caught) => setError(caught instanceof Error ? caught.message : 'Could not update squad.'));
   };
 
   const moveToActive = (slot: SquadSlot) => {
     if (activeSlots.length >= 25) return;
-    setReserveSlots((current) => current.filter((entry) => entry.id !== slot.id));
-    setActiveSlots((current) => [...current, { ...slot, id: `active-${slot.id}` }]);
-    setStatusMessage(`${slot.player.name} moved to Active.`);
+    promoteSquad(token, slot.player.ticker).then(() => { setReserveSlots((current) => current.filter((entry) => entry.id !== slot.id)); setActiveSlots((current) => [...current, { ...slot, id: `active-${slot.id}` }]); setStatusMessage(`${slot.player.name} moved to Active.`); }).catch((caught) => setError(caught instanceof Error ? caught.message : 'Could not update squad.'));
   };
 
   return (
     <div className="fy-screen">
       <BlurFade><h1 className="fy-page-title">Squad</h1></BlurFade>
       <p className="fy-squad-status" role="status" aria-live="polite">{statusMessage}</p>
-      <BlurFade><GlassCard><CardTitle title="Pre-Season Team Bonds" action={<Button size="sm" variant="secondary">Add Team Bond</Button>} /><div className="fy-team-bonds">{[
-        { team: 'Arsenal', amount: '4,000', detail: 'YoY league position' },
-        { team: 'Real Madrid', amount: '3,500', detail: 'YoY league position' },
-      ].map((bond) => <div className="fy-bond" key={bond.team}>{bond.team} · <CurrencyAmount>{bond.amount}</CurrencyAmount> · {bond.detail}</div>)}<div className="fy-bond">Add Team Bond</div></div></GlassCard></BlurFade>
+      {error && <p className="fy-auth-error" role="alert">{error}</p>}
       <BlurFade delay={0.08}><GlassCard><CardTitle title={`Active Squad ${activeSlots.length}/25`} /><SquadGrid slots={activeSlots} capacity={25} active actionDisabled={reserveSlots.length >= 15} onReserve={moveToReserve} onEmpty={() => setScreen('markets')} /></GlassCard></BlurFade>
       <BlurFade delay={0.14}><GlassCard><CardTitle title={`Reserve Squad ${reserveSlots.length}/15`} /><SquadGrid slots={reserveSlots} capacity={15} actionDisabled={activeSlots.length >= 25} onActivate={moveToActive} onEmpty={() => setScreen('markets')} /></GlassCard></BlurFade>
     </div>
@@ -56,7 +54,7 @@ function SquadGrid({ slots, capacity, active = false, actionDisabled = false, on
         <div className="fy-squad-card" key={slot.id}>
           <Avatar name={slot.player.name} fallback={slot.player.photo} showStatus={false} />
           <strong>{slot.player.ticker}</strong><span><CurrencyAmount>{slot.player.price}</CurrencyAmount></span>
-          {active && <Badge variant="warning"><CurrencyAmount>Earning</CurrencyAmount></Badge>}
+          {active && <Badge variant="success">Active</Badge>}
           {active
             ? <HoldAndReleaseButton disabled={actionDisabled} idleLabel={actionDisabled ? 'Reserve Full' : 'Hold to Reserve'} aria-label={`Hold to move ${slot.player.name} to reserve`} onComplete={() => onReserve?.(slot)} />
             : <Button disabled={actionDisabled} size="sm" variant="secondary" onClick={() => onActivate?.(slot)}>{actionDisabled ? 'Active Full' : 'Move to Active'}</Button>}
