@@ -1,4 +1,3 @@
-from contextlib import asynccontextmanager
 import logging
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
@@ -9,7 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from app.api.deps import admin_user, current_user, supabase_identity, verified_user, oauth2
 from app.core.config import settings
-from app.core.database import Base, engine, get_db
+from app.core.database import engine, get_db
 from app.core.security import create_access_token
 from app.models import ActiveSquad, AuditLog, Holding, MarketPrice, Notification, Order, Player, User, Wallet, WalletTransaction, Watchlist
 from app.schemas import AdminStatusIn, AdminUserOut, AgeVerificationIn, CatalogImportIn, CatalogImportOut, CreditIn, HoldingOut, LoginIn, MarketPlayerOut, OrderIn, OrderOut, ProfileSummaryOut, ProfileUpdateIn, RegisterIn, SquadOut, SquadPlayerIn, SupabaseSyncIn, UserProfileOut, WalletOut, WalletTransactionOut, WatchlistIn, WatchlistOut
@@ -18,12 +17,7 @@ from app.integrations.market_engine import MarketEngineUnavailable, market_engin
 
 logger = logging.getLogger("fieldyield.api")
 
-@asynccontextmanager
-async def lifespan(app):
-    Base.metadata.create_all(engine)
-    yield
-
-app = FastAPI(title="FieldYield Exchange API", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="FieldYield Exchange API", version="1.0.0")
 print("CORS allowed origin:", settings.frontend_url)
 app.add_middleware(
     CORSMiddleware,
