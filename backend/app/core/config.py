@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     market_engine_api_key: str | None = None
     market_engine_timeout_ms: int = 3000
     market_engine_version: str = "v1"
+    market_engine_trading_enabled: bool = False
     supabase_url: str | None = None
     supabase_anon_key: str | None = None
     supabase_service_role_key: str | None = None

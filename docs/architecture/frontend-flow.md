@@ -14,6 +14,15 @@ The initial browser path can be loaded directly because Vercel serves the SPA
 entry document. The asset page is a selected-player view, not a separate
 backend route.
 
+## Authentication state machine
+
+`App` now treats authentication as explicit states:
+`unauthenticated`, `authenticating`, `authenticated_syncing`,
+`profile_incomplete`, `ready`, `suspended`, `auth_error`, and `sync_error`.
+Protected dashboard content and private data loaders run only in `ready`.
+`profile_incomplete`, `suspended`, and `sync_error` are visible user states,
+not implicit returns to the login form.
+
 ## Authentication restoration
 
 1. `App` reads the local compatibility token key
@@ -23,12 +32,15 @@ backend route.
    the implicit OAuth flow.
 3. `App` calls `supabase.auth.getSession()` and subscribes to
    `onAuthStateChange`. A Supabase access token is copied to the compatibility
-   key so the existing API client can use one bearer-token path.
+   key only after a valid session exists so the existing API client can use one
+   bearer-token path.
 4. `fetchCurrentUser` calls `GET /api/v1/users/me`. A valid Supabase token must
    already be linked to `users.auth_provider_id`.
 5. For a new Supabase identity, `App` calls `supabase.auth.getUser()` and the
    authenticated `POST /api/v1/auth/supabase-sync` endpoint. A missing date of
    birth is treated as profile completion rather than as a silent logout.
+   Duplicate session events are guarded by a single-flight sync keyed to the
+   active token; stale sync results are ignored after logout or token changes.
 6. On logout, Supabase signs out when configured, the compatibility token is
    removed, local user data is cleared, and the shell returns to `AuthPage`.
 
@@ -67,8 +79,11 @@ role or bypass suspension.
 `src/lib/api.ts` derives the origin from `VITE_API_BASE_URL` and removes a
 trailing slash. `apiGet`, `apiGetWithToken`, `apiPost`, and `apiPatch` send
 JSON and `Accept` headers, attach `Authorization: Bearer <token>` for private
-calls, parse `{ detail }` errors, and throw a user-presentable `Error` for
-non-2xx responses. There is no automatic retry or global query cache.
+calls, parse `{ detail, request_id }` errors, and throw `ApiError` with the
+HTTP status for non-2xx responses. 401 signs out safely; 403 shows suspended,
+age-verification, or authorization state; profile-sync failures are retryable
+without destroying a valid Supabase session. There is no automatic retry or
+global query cache.
 
 The current UI uses bounded requests:
 

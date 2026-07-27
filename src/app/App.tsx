@@ -17,13 +17,18 @@ import { Watchlist } from '@/features/watchlist/Watchlist';
 import { CurrencyIcon } from '@/components/ui/currency-icon';
 import type { SearchItem } from '@/features/search/ActionSearchBar';
 import { type AssetVariant, type ModalName, type Player, type Screen } from '@/data/fieldyield';
-import { fetchCurrentUser, fetchMarketPlayers, fetchNotifications, fetchProfileSummary, fetchWallet, fetchWatchlist, syncSupabaseUser, type CurrentUser, type ProfileSummary, type Wallet, type WatchlistEntry } from '@/lib/api';
+import { ApiError, fetchCurrentUser, fetchMarketPlayers, fetchNotifications, fetchProfileSummary, fetchWallet, fetchWatchlist, syncSupabaseUser, type CurrentUser, type ProfileSummary, type Wallet, type WatchlistEntry } from '@/lib/api';
 import { clearOAuthUrl, supabase } from '@/lib/supabase';
 
 const AUTH_TOKEN_KEY = 'fieldyield.authToken';
+type AuthState = 'unauthenticated' | 'authenticating' | 'authenticated_syncing' | 'profile_incomplete' | 'ready' | 'suspended' | 'auth_error' | 'sync_error';
 
 export function App() {
   const [authToken, setAuthToken] = useState<string | null>(() => window.localStorage.getItem(AUTH_TOKEN_KEY));
+  const [authState, setAuthState] = useState<AuthState>(() => window.localStorage.getItem(AUTH_TOKEN_KEY) ? 'authenticating' : 'unauthenticated');
+  const [authMessage, setAuthMessage] = useState<string | null>(null);
+  const [bonusMessage, setBonusMessage] = useState<string | null>(null);
+  const [syncRetry, setSyncRetry] = useState(0);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [requiresSupabaseProfile, setRequiresSupabaseProfile] = useState(false);
   const [wallet, setWallet] = useState<Wallet | null>(null);
@@ -39,41 +44,70 @@ export function App() {
   const [assetState, setAssetState] = useState<AssetVariant>('normal');
   const [tradeSide, setTradeSide] = useState<'buy' | 'sell'>('buy');
   const mainRef = useRef<HTMLElement>(null);
+  const syncFlight = useRef<Promise<void> | null>(null);
+  const syncFlightToken = useRef<string | null>(null);
+  const syncGeneration = useRef(0);
   const hasMounted = useRef(false);
   const pageTitle = screen === 'asset' && asset ? asset.name : `${screen.charAt(0).toUpperCase()}${screen.slice(1)}`;
+
+  const clearUserState = useCallback(() => {
+    window.localStorage.removeItem(AUTH_TOKEN_KEY);
+    setAuthToken(null);
+    setCurrentUser(null);
+    setRequiresSupabaseProfile(false);
+    setWallet(null);
+    setSummary(null);
+    setWatchlist([]);
+    setMarketPlayers([]);
+    setBonusMessage(null);
+  }, []);
 
   useEffect(() => {
     if (!supabase) return;
     let active = true;
     supabase.auth.getSession().then(({ data }) => {
-      if (active && data.session) { clearOAuthUrl(); setAuthToken(data.session.access_token); }
+      if (active && data.session) { clearOAuthUrl(); window.localStorage.setItem(AUTH_TOKEN_KEY, data.session.access_token); setAuthToken(data.session.access_token); setAuthState('authenticated_syncing'); }
+      if (active && !data.session) setAuthState('unauthenticated');
     });
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (!active) return;
-      if (session) { clearOAuthUrl(); setAuthToken(session.access_token); }
+      if (session) { clearOAuthUrl(); window.localStorage.setItem(AUTH_TOKEN_KEY, session.access_token); setAuthToken(session.access_token); setAuthState('authenticated_syncing'); }
       if (event === 'SIGNED_OUT') {
-        window.localStorage.removeItem(AUTH_TOKEN_KEY);
-        setCurrentUser(null);
-        setRequiresSupabaseProfile(false);
-        setAuthToken(null);
+        syncGeneration.current += 1;
+        clearUserState();
+        setAuthState('unauthenticated');
       }
     });
     return () => { active = false; listener.subscription.unsubscribe(); };
-  }, []);
+  }, [clearUserState]);
 
   useEffect(() => {
     if (!authToken) {
-      setCurrentUser(null);
+      clearUserState();
       setAuthLoading(false);
+      setAuthState('unauthenticated');
       document.title = 'Login · FieldYield';
       return;
     }
 
     let cancelled = false;
+    const generation = ++syncGeneration.current;
     setAuthLoading(true);
-    fetchCurrentUser(authToken)
+    setAuthState('authenticated_syncing');
+    const runSync = async () => {
+      const user = await fetchCurrentUser(authToken);
+      if (!cancelled && generation === syncGeneration.current) {
+        setCurrentUser(user);
+        setAuthState(user.account_status === 'active' ? 'ready' : 'suspended');
+      }
+    };
+    if (!syncFlight.current || syncFlightToken.current !== authToken) {
+      syncFlightToken.current = authToken;
+      syncFlight.current = runSync();
+    }
+    syncFlight.current
       .then((user) => {
-        if (!cancelled) setCurrentUser(user);
+        void user;
       })
       .catch(async () => {
         if (supabase) {
@@ -85,46 +119,69 @@ export function App() {
             const profile = { date_of_birth: metadata?.date_of_birth ?? stored.date_of_birth, username: metadata?.username ?? stored.username };
             if (data.user) {
               const synced = await syncSupabaseUser(authToken, profile);
-              if (!cancelled) {
+              if (!cancelled && generation === syncGeneration.current) {
+                if (synced.status === 'profile_incomplete') {
+                  setRequiresSupabaseProfile(true);
+                  setAuthState('profile_incomplete');
+                  setAuthMessage('Finish your profile to continue.');
+                  return;
+                }
+                if (!synced.user) throw new Error('Profile synchronization failed');
                 window.localStorage.removeItem('fieldyield.pendingSupabaseProfile');
                 setRequiresSupabaseProfile(false);
-                setCurrentUser(synced);
+                setCurrentUser(synced.user);
+                setAuthState('ready');
+                if (synced.bonus?.granted_now) setBonusMessage(`Welcome bonus credited: ${synced.bonus.gold ?? 0} Gold${synced.bonus.silver ? ` and ${synced.bonus.silver} Silver` : ''}.`);
                 return;
               }
             }
           } catch (syncError) {
             const message = syncError instanceof Error ? syncError.message : '';
-            if (message.includes('Date of birth is required') && !cancelled) {
+            if (message.includes('Date of birth is required') && !cancelled && generation === syncGeneration.current) {
               setRequiresSupabaseProfile(true);
+              setAuthState('profile_incomplete');
+              return;
+            }
+            if (syncError instanceof ApiError && syncError.status === 401) {
+              if (!cancelled) {
+                syncGeneration.current += 1;
+                await supabase.auth.signOut();
+                clearUserState();
+                setAuthState('unauthenticated');
+              }
+              return;
+            }
+            if (syncError instanceof ApiError && syncError.status === 403 && !cancelled) {
+              setAuthState('suspended');
+              setAuthMessage(syncError.message);
               return;
             }
           }
         }
         if (!cancelled) {
-          void supabase?.auth.signOut();
-          window.localStorage.removeItem(AUTH_TOKEN_KEY);
-          setAuthToken(null);
-          setCurrentUser(null);
-          setRequiresSupabaseProfile(false);
+          setAuthState('sync_error');
+          setAuthMessage('Could not sync your FieldYield profile. You can retry without signing in again.');
         }
       })
       .finally(() => {
+        syncFlight.current = null;
+        syncFlightToken.current = null;
         if (!cancelled) setAuthLoading(false);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [authToken]);
+  }, [authToken, clearUserState, syncRetry]);
 
   useEffect(() => {
-    if (!authToken) return;
+    if (!authToken || authState !== 'ready') return;
     Promise.all([fetchWallet(authToken), fetchProfileSummary(authToken), fetchNotifications(authToken).catch(() => []), fetchMarketPlayers().catch(() => []), fetchWatchlist(authToken).catch(() => [])]).then(([nextWallet, nextSummary, notifications, nextPlayers, nextWatchlist]) => {
       setWallet(nextWallet); setSummary(nextSummary); setNotificationCount(notifications.filter((entry) => !entry.read).length);
       setMarketPlayers(nextPlayers.map((entry) => ({ ticker: entry.symbol, name: entry.name, club: entry.club, league: entry.league, price: Number(entry.ask), change: null, volume: null, yield: null, owned: null, status: entry.active ? 'Open' : 'Frozen', photo: entry.name.slice(0, 2).toUpperCase() })));
       setWatchlist(nextWatchlist);
     }).catch(() => undefined);
-  }, [authToken]);
+  }, [authToken, authState]);
 
   useEffect(() => {
     document.title = `${pageTitle} · FieldYield`;
@@ -159,12 +216,13 @@ export function App() {
     setAuthToken(token);
     setRequiresSupabaseProfile(false);
     setCurrentUser(user);
+    setAuthState('ready');
   }, []);
   const handleLogout = useCallback(() => {
+    syncGeneration.current += 1;
     void supabase?.auth.signOut();
-    window.localStorage.removeItem(AUTH_TOKEN_KEY);
-    setAuthToken(null); setCurrentUser(null); setWallet(null); setSummary(null); setWatchlist([]); setMarketPlayers([]); setScreen('dashboard');
-  }, []);
+    clearUserState(); setAuthState('unauthenticated'); setScreen('dashboard');
+  }, [clearUserState]);
 
   const searchItems = useMemo<SearchItem[]>(() => {
     const pageItems: SearchItem[] = [
@@ -228,7 +286,34 @@ export function App() {
     );
   }
 
-  if (!authToken || !currentUser) {
+  if (authState === 'suspended') {
+    return (
+      <main className="fy-auth-screen" aria-label="Account suspended">
+        <section className="fy-auth-card">
+          <span className="fy-auth-kicker">FieldYield Exchange</span>
+          <h1>Account unavailable</h1>
+          <p className="fy-muted">{authMessage ?? 'This account is currently suspended.'}</p>
+          <button className="fy-auth-submit" type="button" onClick={handleLogout}>Sign out</button>
+        </section>
+      </main>
+    );
+  }
+
+  if (authState === 'sync_error') {
+    return (
+      <main className="fy-auth-screen" aria-label="Profile sync error">
+        <section className="fy-auth-card">
+          <span className="fy-auth-kicker">FieldYield Exchange</span>
+          <h1>Profile sync failed</h1>
+          <p className="fy-muted">{authMessage ?? 'Your Supabase session is valid, but the FieldYield profile could not be synchronized.'}</p>
+          <button className="fy-auth-submit" type="button" onClick={() => setSyncRetry((value) => value + 1)}>Retry sync</button>
+          <button className="fy-google-button" type="button" onClick={handleLogout}>Sign out</button>
+        </section>
+      </main>
+    );
+  }
+
+  if (!authToken || !currentUser || authState === 'profile_incomplete') {
     return <AuthPage onAuthenticated={handleAuthenticated} requiresSupabaseProfile={requiresSupabaseProfile} />;
   }
 
@@ -236,6 +321,7 @@ export function App() {
     <div className="fy-app-shell">
       <a className="fy-skip-link" href="#fy-main-content">Skip to content</a>
       <Header searchItems={searchItems} onBalance={openBalances} onBell={openDrawer} onBrandClick={() => navigate('dashboard')} onProfile={() => navigate('settings')} notificationCount={notificationCount} wallet={wallet} user={currentUser} />
+      {bonusMessage && <button className="fy-auth-error" type="button" onClick={() => setBonusMessage(null)}>{bonusMessage}</button>}
       <main id="fy-main-content" ref={mainRef} tabIndex={-1} aria-label={`${pageTitle} page`} className="fy-main-frame">
         {screen === 'dashboard' && <Dashboard openAsset={openAsset} setScreen={navigate} setModal={setModal} onBuy={openBuy} summary={summary} players={marketPlayers} watchlist={watchlist} />}
         {screen === 'asset' && asset && <AssetPage player={asset} variant={assetState} tradeSide={tradeSide} setTradeSide={setTradeSide} setVariant={setAssetState} setModal={setModal} />}

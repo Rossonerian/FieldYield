@@ -32,14 +32,14 @@ def register(db, email, password, dob, username=None, first_name=None, last_name
         raise HTTPException(409, "Account details are already registered")
     db.refresh(user); return user
 
-def _grant_signup_bonus(db: Session, user: User, wallet: Wallet) -> None:
+def _grant_signup_bonus(db: Session, user: User, wallet: Wallet) -> bool:
     if not settings.signup_bonus_enabled or "test_fieldyield" in settings.database_url or not (settings.signup_bonus_gold or settings.signup_bonus_silver):
-        return
+        return False
     wallet = db.scalar(select(Wallet).where(Wallet.user_id == user.id).with_for_update()) or wallet
     grant_key = f"signup_bonus:{user.id}"
     if db.scalar(select(SignupBonusGrant).where(SignupBonusGrant.user_id == user.id)):
         user.signup_bonus_awarded_at = user.signup_bonus_awarded_at or now()
-        return
+        return False
     db.add(SignupBonusGrant(user_id=user.id, gold_amount=settings.signup_bonus_gold, silver_amount=settings.signup_bonus_silver, idempotency_key=grant_key))
     if settings.signup_bonus_gold:
         wallet.gold += settings.signup_bonus_gold
@@ -48,8 +48,9 @@ def _grant_signup_bonus(db: Session, user: User, wallet: Wallet) -> None:
         wallet.silver += settings.signup_bonus_silver
         db.add(WalletTransaction(user_id=user.id, currency="silver", amount=settings.signup_bonus_silver, reason="signup_bonus", idempotency_key=f"signup_bonus:{user.id}:silver"))
     user.signup_bonus_awarded_at = now()
+    return True
 
-def sync_supabase_user(db: Session, *, provider_id: str, provider: str, email: str, date_of_birth: datetime | None = None, username: str | None = None, first_name: str | None = None, last_name: str | None = None) -> User:
+def sync_supabase_user(db: Session, *, provider_id: str, provider: str, email: str, date_of_birth: datetime | None = None, username: str | None = None, first_name: str | None = None, last_name: str | None = None) -> tuple[User | None, bool, list[str]]:
     if provider not in {"google", "email", "supabase"}:
         provider = "supabase"
     existing = db.scalar(select(User).where(User.auth_provider_id == provider_id))
@@ -63,28 +64,28 @@ def sync_supabase_user(db: Session, *, provider_id: str, provider: str, email: s
         if existing.account_status != "active":
             raise HTTPException(403, "Account is suspended")
         db.commit(); db.refresh(existing)
-        return existing
+        return existing, False, []
     email_match = db.scalar(select(User).where(User.email == email.lower()))
     if email_match:
         raise HTTPException(409, "An account with this email already exists; sign in with its linked provider or link identities in Supabase")
     if date_of_birth is None:
-        raise HTTPException(400, "Date of birth is required to create your profile")
+        return None, False, ["date_of_birth"]
     if not age_ok(date_of_birth):
         raise HTTPException(400, "User must be 18 or older")
     normalized_username = username.lower() if username else None
     if normalized_username and db.scalar(select(User).where(User.username == normalized_username)):
         raise HTTPException(409, "Username already registered")
     user = User(email=email.lower(), username=normalized_username, first_name=first_name, last_name=last_name, role="admin" if email.lower() in settings.configured_admin_emails else "user", auth_provider=provider, auth_provider_id=provider_id, password_hash=hash_password(secrets.token_urlsafe(32)), date_of_birth=date_of_birth, age_verified=True)
-    db.add(user); db.flush(); wallet = Wallet(user_id=user.id); db.add(wallet); db.flush(); _grant_signup_bonus(db, user, wallet)
+    db.add(user); db.flush(); wallet = Wallet(user_id=user.id); db.add(wallet); db.flush(); granted_now = _grant_signup_bonus(db, user, wallet)
     try:
         db.commit()
     except IntegrityError as exc:
         db.rollback()
         concurrent = db.scalar(select(User).where(User.auth_provider_id == provider_id))
         if concurrent:
-            return concurrent
+            return concurrent, False, []
         raise HTTPException(409, "Account identity is already registered") from exc
-    db.refresh(user); return user
+    db.refresh(user); return user, granted_now, []
 
 def authenticate(db, email, password):
     user = db.scalar(select(User).where(User.email == email))

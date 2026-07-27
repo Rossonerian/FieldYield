@@ -1,4 +1,7 @@
 import logging
+import time
+from collections import defaultdict, deque
+from uuid import uuid4
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
@@ -11,7 +14,7 @@ from app.core.config import settings
 from app.core.database import engine, get_db
 from app.core.security import create_access_token
 from app.models import ActiveSquad, AuditLog, Holding, MarketPrice, Notification, Order, Player, User, Wallet, WalletTransaction, Watchlist
-from app.schemas import AdminStatusIn, AdminUserOut, AgeVerificationIn, CatalogImportIn, CatalogImportOut, CreditIn, HoldingOut, LoginIn, MarketPlayerOut, OrderIn, OrderOut, ProfileSummaryOut, ProfileUpdateIn, RegisterIn, SquadOut, SquadPlayerIn, SupabaseSyncIn, UserProfileOut, WalletOut, WalletTransactionOut, WatchlistIn, WatchlistOut
+from app.schemas import AdminStatusIn, AdminUserOut, AgeVerificationIn, CatalogImportIn, CatalogImportOut, CreditIn, HoldingOut, LoginIn, MarketPlayerOut, OrderIn, OrderOut, ProfileSummaryOut, ProfileUpdateIn, RegisterIn, SignupBonusSyncOut, SquadOut, SquadPlayerIn, SupabaseSyncIn, SupabaseSyncOut, UserProfileOut, WalletOut, WalletTransactionOut, WatchlistIn, WatchlistOut
 from app.services import age_ok, authenticate, credit, order, register, sync_supabase_user
 from app.integrations.market_engine import MarketEngineUnavailable, market_engine
 
@@ -27,17 +30,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+_rate_windows: dict[tuple[str, str], deque[float]] = defaultdict(deque)
+
+def _rate_limit(request: Request, bucket: str, limit: int, window_seconds: int = 60) -> None:
+    now_seconds = time.monotonic()
+    client = request.client.host if request.client else "unknown"
+    key = (bucket, client)
+    window = _rate_windows[key]
+    while window and now_seconds - window[0] > window_seconds:
+        window.popleft()
+    if len(window) >= limit:
+        raise HTTPException(429, "Too many requests; retry later")
+    window.append(now_seconds)
+
 @app.middleware("http")
 async def request_logging_middleware(request: Request, call_next):
+    request_id = request.headers.get("x-request-id") or str(uuid4())
+    request.state.request_id = request_id
     response = await call_next(request)
-    logger.info("%s %s -> %s", request.method, request.url, response.status_code)
+    response.headers["X-Request-ID"] = request_id
+    logger.info("request_id=%s method=%s path=%s status=%s", request_id, request.method, request.url.path, response.status_code)
     return response
 
 @app.exception_handler(HTTPException)
-async def http_exception_handler(_request: Request, exc: HTTPException):
+async def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
         status_code=exc.status_code,
-        content={"detail": exc.detail},
+        content={"detail": exc.detail, "request_id": getattr(request.state, "request_id", None)},
         headers={
             "Access-Control-Allow-Origin": settings.frontend_url,
             "Access-Control-Allow-Credentials": "true",
@@ -45,11 +64,11 @@ async def http_exception_handler(_request: Request, exc: HTTPException):
     )
 
 @app.exception_handler(Exception)
-async def global_exception_handler(_request: Request, _exc: Exception):
-    logger.exception("Unhandled API exception")
+async def global_exception_handler(request: Request, _exc: Exception):
+    logger.exception("Unhandled API exception request_id=%s", getattr(request.state, "request_id", None))
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal Server Error"},
+        content={"detail": "Internal Server Error", "request_id": getattr(request.state, "request_id", None)},
         headers={
             "Access-Control-Allow-Origin": settings.frontend_url,
             "Access-Control-Allow-Credentials": "true",
@@ -80,7 +99,7 @@ def health():
             supabase = "unavailable"
     auth = settings.effective_auth_provider
     auth_ready = auth != "supabase" or supabase == "ok"
-    return {"status": "ok" if database == "ok" and auth_ready else "degraded", "database": database, "supabase": supabase, "auth_provider": auth, "market_engine": market, "version": app.version}
+    return {"status": "ok" if database == "ok" and auth_ready else "degraded", "database": database, "supabase": supabase, "auth_provider": auth, "market_engine": market, "market_engine_trading_enabled": settings.market_engine_trading_enabled, "version": app.version}
 
 @app.get("/api/v1/market-engine/health")
 def market_engine_health():
@@ -92,14 +111,16 @@ def market_engine_health():
         raise HTTPException(503, "Market Engine is unavailable")
 
 @app.post("/api/v1/auth/register")
-def register_user(body: RegisterIn, db: Session = Depends(get_db)):
+def register_user(body: RegisterIn, request: Request, db: Session = Depends(get_db)):
+    _rate_limit(request, "auth_register", 10)
     if settings.effective_auth_provider == "supabase":
         raise HTTPException(410, "Use Supabase Auth for registration")
     user = register(db, body.email, body.password, body.date_of_birth, body.username, body.first_name, body.last_name)
     return {"id": user.id, "email": user.email, "signup_bonus_awarded": bool(user.signup_bonus_awarded_at)}
 
 @app.post("/api/v1/auth/login")
-def login(body: LoginIn, db: Session = Depends(get_db)):
+def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
+    _rate_limit(request, "auth_login", 20)
     if settings.effective_auth_provider == "supabase":
         raise HTTPException(410, "Use Supabase Auth for login")
     user = authenticate(db, body.email, body.password)
@@ -108,7 +129,8 @@ def login(body: LoginIn, db: Session = Depends(get_db)):
     return {"access_token": create_access_token(str(user.id)), "token_type": "bearer"}
 
 @app.post("/api/v1/auth/token")
-def token(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def token(request: Request, form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    _rate_limit(request, "auth_token", 20)
     if settings.effective_auth_provider == "supabase":
         raise HTTPException(410, "Use Supabase Auth for login")
     user = authenticate(db, form.username, form.password)
@@ -116,15 +138,24 @@ def token(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
         raise HTTPException(status_code=401, detail="Invalid credentials")
     return {"access_token": create_access_token(str(user.id)), "token_type": "bearer"}
 
-@app.post("/api/v1/auth/supabase-sync")
-def supabase_sync(body: SupabaseSyncIn, token: str | None = Depends(oauth2), db: Session = Depends(get_db)):
+@app.post("/api/v1/auth/supabase-sync", response_model=SupabaseSyncOut)
+def supabase_sync(body: SupabaseSyncIn, request: Request, token: str | None = Depends(oauth2), db: Session = Depends(get_db)):
+    _rate_limit(request, "supabase_sync", 30)
     if settings.effective_auth_provider != "supabase":
         raise HTTPException(410, "Supabase Auth is not enabled for this deployment")
     identity = supabase_identity(token or "")
     if not identity:
         raise HTTPException(401, "Valid Supabase session required")
-    user = sync_supabase_user(db, provider_id=str(identity["id"]), provider=str(identity["provider"]), email=str(identity["email"]), date_of_birth=body.date_of_birth, username=body.username, first_name=body.first_name, last_name=body.last_name)
-    return profile_view(user)
+    user, granted_now, required_fields = sync_supabase_user(db, provider_id=str(identity["id"]), provider=str(identity["provider"]), email=str(identity["email"]), date_of_birth=body.date_of_birth, username=body.username, first_name=body.first_name, last_name=body.last_name)
+    if required_fields:
+        return SupabaseSyncOut(status="profile_incomplete", required_fields=required_fields)
+    if user is None:
+        raise HTTPException(500, "Profile synchronization failed")
+    return SupabaseSyncOut(
+        status="ready",
+        user=profile_view(user),
+        bonus=SignupBonusSyncOut(granted_now=granted_now, already_granted=not granted_now and bool(user.signup_bonus_awarded_at), gold=float(settings.signup_bonus_gold) if granted_now else None, silver=float(settings.signup_bonus_silver) if granted_now else None),
+    )
 
 @app.get("/api/v1/users/me")
 def me(user: User = Depends(current_user)) -> UserProfileOut:

@@ -34,6 +34,22 @@ export type ApiOrder = { id: number; player_id: number; side: string; quantity: 
 export type SquadEntry = { id: number; player_id: number; position: number; symbol: string; name: string; club: string; league: string };
 export type HoldingEntry = { symbol: string; name: string; league: string; club: string; quantity: number; average_cost: number; realized_pnl: number; market_price: number; market_value: number };
 export type AdminUser = { id: number; email: string; username: string | null; account_status: string; role: string; created_at: string; signup_bonus_awarded: boolean; wallet_gold: number; wallet_silver: number };
+export type SignupBonusSync = { granted_now: boolean; already_granted: boolean; gold?: number | null; silver?: number | null };
+export type SupabaseSyncResponse = { status: 'profile_incomplete' | 'ready'; user: CurrentUser | null; required_fields: string[]; bonus?: SignupBonusSync | null };
+
+export class ApiError extends Error {
+  status: number;
+  requestId?: string;
+
+  constructor(status: number, detail: unknown, fallback: string) {
+    const message = typeof detail === 'object' && detail && 'detail' in detail ? String((detail as { detail?: unknown }).detail) : fallback;
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    const requestId = typeof detail === 'object' && detail && 'request_id' in detail ? (detail as { request_id?: unknown }).request_id : undefined;
+    if (typeof requestId === 'string') this.requestId = requestId;
+  }
+}
 
 export type SportsLeague = {
   provider_id: number;
@@ -63,7 +79,7 @@ async function apiGet<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, { headers: { Accept: 'application/json' } });
   if (!response.ok) {
     const detail = await response.json().catch(() => null);
-    throw new Error(detail?.detail ?? `Request failed with ${response.status}`);
+    throw new ApiError(response.status, detail, `Request failed with ${response.status}`);
   }
   return response.json() as Promise<T>;
 }
@@ -80,7 +96,7 @@ async function apiPost<T>(path: string, body: unknown, token?: string): Promise<
   });
   if (!response.ok) {
     const detail = await response.json().catch(() => null);
-    throw new Error(detail?.detail ?? `Request failed with ${response.status}`);
+    throw new ApiError(response.status, detail, `Request failed with ${response.status}`);
   }
   return response.json() as Promise<T>;
 }
@@ -89,7 +105,7 @@ async function apiPatch<T>(path: string, body: unknown, token: string): Promise<
   const response = await fetch(`${API_BASE_URL}${path}`, { method: 'PATCH', headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
   if (!response.ok) {
     const detail = await response.json().catch(() => null);
-    throw new Error(detail?.detail ?? `Request failed with ${response.status}`);
+    throw new ApiError(response.status, detail, `Request failed with ${response.status}`);
   }
   return response.json() as Promise<T>;
 }
@@ -108,7 +124,7 @@ export function loginUser(email: string, password: string) {
 }
 
 export function syncSupabaseUser(token: string, body: { date_of_birth?: string; username?: string; first_name?: string; last_name?: string }) {
-  return apiPost<CurrentUser>('/api/v1/auth/supabase-sync', body, token);
+  return apiPost<SupabaseSyncResponse>('/api/v1/auth/supabase-sync', body, token);
 }
 
 export async function fetchCurrentUser(token: string) {
@@ -117,7 +133,7 @@ export async function fetchCurrentUser(token: string) {
   });
   if (!response.ok) {
     const detail = await response.json().catch(() => null);
-    throw new Error(detail?.detail ?? `Request failed with ${response.status}`);
+    throw new ApiError(response.status, detail, `Request failed with ${response.status}`);
   }
   return response.json() as Promise<CurrentUser>;
 }
@@ -147,13 +163,13 @@ export function fetchNotifications(token: string) { return apiGetWithToken<Array
 export function markNotificationRead(token: string, notificationId: number) { return apiPost(`/api/v1/notifications/${notificationId}/read`, {}, token); }
 export function fetchWatchlist(token: string) { return apiGetWithToken<WatchlistEntry[]>('/api/v1/watchlists', token); }
 export function addWatchlist(token: string, symbol: string) { return apiPost<WatchlistEntry>('/api/v1/watchlists', { symbol }, token); }
-export async function removeWatchlist(token: string, symbol: string) { const response = await fetch(`${API_BASE_URL}/api/v1/watchlists/${encodeURIComponent(symbol)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }); if (!response.ok) throw new Error('Could not remove player from watchlist'); }
+export async function removeWatchlist(token: string, symbol: string) { const response = await fetch(`${API_BASE_URL}/api/v1/watchlists/${encodeURIComponent(symbol)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }); if (!response.ok) throw new ApiError(response.status, null, 'Could not remove player from watchlist'); }
 
 async function apiGetWithToken<T>(path: string, token: string): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, { headers: { Accept: 'application/json', Authorization: `Bearer ${token}` } });
   if (!response.ok) {
     const detail = await response.json().catch(() => null);
-    throw new Error(detail?.detail ?? `Request failed with ${response.status}`);
+    throw new ApiError(response.status, detail, `Request failed with ${response.status}`);
   }
   return response.json() as Promise<T>;
 }

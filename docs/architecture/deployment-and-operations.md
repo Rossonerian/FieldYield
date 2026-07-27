@@ -63,13 +63,15 @@ MARKET_ENGINE_BASE_URL=<optional-external-origin>
 MARKET_ENGINE_API_KEY=<optional-server-only-key>
 MARKET_ENGINE_TIMEOUT_MS=3000
 MARKET_ENGINE_VERSION=v1
+MARKET_ENGINE_TRADING_ENABLED=false
 ALLOW_TEST_CREDIT=false
 ```
 
 The service-role variable is reserved for server-side administration and is
 not currently sent to the browser. `ALLOW_TEST_CREDIT` must remain false in
-production. Empty `MARKET_ENGINE_*` values are intentional until the external
-contract is complete.
+production. `MARKET_ENGINE_TRADING_ENABLED` must remain `false` until sandbox
+contract tests prove order/fill/cancellation behavior. Empty `MARKET_ENGINE_*`
+values are intentional until the external contract is complete.
 
 ## Supabase Auth and Google
 

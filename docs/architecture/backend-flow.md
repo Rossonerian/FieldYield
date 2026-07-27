@@ -48,7 +48,9 @@ selected auth provider is ready. The `supabase` and `market_engine` fields
 separately report `ok`, `unavailable`, or `not_configured`; the latter is
 intentional for the optional external integration. The currently deployed
 endpoint has been observed returning database/Supabase `ok` and
-Market Engine `not_configured`.
+Market Engine `not_configured`. `market_engine_trading_enabled` must remain
+`false` until sandbox contract tests cover order acceptance, fills, duplicate
+requests, cancellation, and FieldYield-side settlement.
 
 `GET /api/v1/market-engine/health` reports the adapter state without exposing
 credentials and returns 503 when a configured engine is unavailable.
@@ -75,7 +77,7 @@ create an admin role or bypass a suspension.
 | Flow | Route/service | Validation and side effects |
 | --- | --- | --- |
 | Local registration | `POST /api/v1/auth/register` → `services.register` | Email/username uniqueness, age >= 18, password hashing, wallet creation, one-time bonus transaction; disabled in Supabase mode |
-| Supabase sync | `POST /api/v1/auth/supabase-sync` → `sync_supabase_user` | Token identity is revalidated; provider ID is unique; email-only merging is rejected; profile/wallet/bonus creation is idempotent |
+| Supabase sync | `POST /api/v1/auth/supabase-sync` → `sync_supabase_user` | Token identity is revalidated; provider ID is unique; email-only merging is rejected; returns `profile_incomplete` with `required_fields` when DOB is missing; profile/wallet/bonus creation is idempotent |
 | Profile | `GET/PATCH /api/v1/users/me` | User comes from the token; editable fields are Pydantic-bounded; system fields are not accepted |
 | Wallet | `GET /api/v1/wallet`, `/ledger` | Reads only the current user's wallet/ledger; ledger requests are limited and offset-bounded |
 | Market order | `POST /api/v1/trading/orders/market-buy|market-sell` → `services.order` | Age verification, active EPL player, price row and wallet/holding row locks, balance/holding checks, order match, ledger entry, notification, idempotency key |
@@ -100,9 +102,11 @@ wallets, watchlist pairs, holdings pairs, and bonus grants.
 
 The signup bonus uses a unique `signup_bonus_grants.user_id`, a deterministic
 idempotency key, a locked wallet, and wallet transaction keys inside the same
-database transaction. Existing users are not backfilled. A retried Supabase
-sync either returns the linked user or safely handles a concurrent unique
-constraint.
+database transaction. Supabase synchronization reports `bonus.granted_now=true`
+only for the transaction that actually grants the bonus. Later logins return
+`already_granted=true` and must not trigger a welcome-bonus message. Existing
+users are not backfilled. A retried Supabase sync either returns the linked
+user or safely handles a concurrent unique constraint.
 
 The global handlers return `{ "detail": "..." }` for expected HTTP errors and
 `{ "detail": "Internal Server Error" }` for unexpected errors. Internal stack
@@ -134,8 +138,12 @@ integrations and is not sent to browsers.
 
 ## Operational logging
 
-Request method/URL/status and unhandled exception traces use Python logging.
-Admin status changes and catalog imports create compact `audit_logs` records.
+Request method/path/status and a generated or caller-supplied `X-Request-ID`
+use Python logging; request IDs are returned with API error JSON for support
+correlation. Tokens, cookies, database URLs, and API keys are not logged by
+the request middleware. Admin status changes and catalog imports create compact
+`audit_logs` records. The current rate limiter is a bounded in-process fallback
+for auth/profile-sync paths; it is not distributed across Render instances.
 There is no external metrics, alerting, or log-retention integration in this
 repository; Render logs and database backups are the current operational
 controls.
