@@ -101,9 +101,10 @@ export function AuthPage({ onAuthenticated, requiresSupabaseProfile = false }: A
       if (supabase && requiresSupabaseProfile) {
         const { data } = await supabase.auth.getSession();
         if (!data.session) throw new Error('Your Google session has expired. Please try again.');
-        const user = await syncSupabaseUser(data.session.access_token, { date_of_birth: new Date(`${dateOfBirth}T00:00:00Z`).toISOString(), username });
+        const sync = await syncSupabaseUser(data.session.access_token, { date_of_birth: new Date(`${dateOfBirth}T00:00:00Z`).toISOString(), username });
+        if (sync.status !== 'ready' || !sync.user) throw new Error('Your profile still needs required fields.');
         window.localStorage.removeItem('fieldyield.pendingSupabaseProfile');
-        onAuthenticated(data.session.access_token, user);
+        onAuthenticated(data.session.access_token, sync.user);
         return;
       }
       if (supabase) {
@@ -111,9 +112,10 @@ export function AuthPage({ onAuthenticated, requiresSupabaseProfile = false }: A
           const { data, error: signupError } = await supabase.auth.signUp({ email, password, options: { data: { username, date_of_birth: dateOfBirth } } });
           if (signupError) throw signupError;
           if (!data.session) { window.localStorage.setItem('fieldyield.pendingSupabaseProfile', JSON.stringify({ date_of_birth: new Date(`${dateOfBirth}T00:00:00Z`).toISOString(), username })); setError('Check your email to confirm the account, then sign in.'); return; }
-          const user = await syncSupabaseUser(data.session.access_token, { date_of_birth: new Date(`${dateOfBirth}T00:00:00Z`).toISOString(), username });
+          const sync = await syncSupabaseUser(data.session.access_token, { date_of_birth: new Date(`${dateOfBirth}T00:00:00Z`).toISOString(), username });
+          if (sync.status !== 'ready' || !sync.user) throw new Error('Your profile still needs required fields.');
           window.localStorage.removeItem('fieldyield.pendingSupabaseProfile');
-          onAuthenticated(data.session.access_token, user);
+          onAuthenticated(data.session.access_token, sync.user);
           return;
         }
         const { data, error: signinError } = await supabase.auth.signInWithPassword({ email, password });
@@ -127,7 +129,9 @@ export function AuthPage({ onAuthenticated, requiresSupabaseProfile = false }: A
           if (pending) {
             try { profile = JSON.parse(pending) as { date_of_birth?: string; username?: string }; } catch { profile = {}; }
           }
-          user = await syncSupabaseUser(data.session.access_token, profile);
+          const sync = await syncSupabaseUser(data.session.access_token, profile);
+          if (sync.status !== 'ready' || !sync.user) throw new Error('Date of birth is required to create your profile');
+          user = sync.user;
           window.localStorage.removeItem('fieldyield.pendingSupabaseProfile');
         }
         onAuthenticated(data.session.access_token, user);

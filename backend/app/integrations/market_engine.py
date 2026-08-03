@@ -52,11 +52,6 @@ class MarketEngineClient:
     def health(self) -> dict[str, Any]:
         return self._request("GET", "/health/ready")
 
-    def bootstrap_user(self, *, user_id: str, cash: Decimal, positions: dict[str, int] | None = None) -> dict[str, Any]:
-        if not user_id or cash < 0 or any(quantity < 0 for quantity in (positions or {}).values()):
-            raise ValueError("Market Engine bootstrap values are invalid")
-        return self._request("POST", f"/v1/users/{user_id}/bootstrap", json={"cash": str(cash), "positions": positions or {}})
-
     def snapshot(self, *, user_id: str, player_id: str) -> dict[str, Any]:
         if not user_id or not player_id:
             raise ValueError("Market Engine snapshot identifiers are required")

@@ -83,6 +83,18 @@ class UserProfileOut(BaseModel):
     preferences: dict
     signup_bonus_awarded: bool
 
+class SignupBonusSyncOut(BaseModel):
+    granted_now: bool
+    already_granted: bool
+    gold: float | None = None
+    silver: float | None = None
+
+class SupabaseSyncOut(BaseModel):
+    status: str
+    user: UserProfileOut | None = None
+    required_fields: list[str] = []
+    bonus: SignupBonusSyncOut | None = None
+
 class WalletOut(BaseModel):
     gold: float
     silver: float

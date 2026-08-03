@@ -36,6 +36,8 @@ services:
         value: "3000"
       - key: MARKET_ENGINE_VERSION
         value: v1
+      - key: MARKET_ENGINE_TRADING_ENABLED
+        value: "false"
       - key: SUPABASE_URL
         value: https://uewpyfwnuiqjzxahmesz.supabase.co
       - key: SUPABASE_ANON_KEY
@@ -44,6 +46,8 @@ services:
         sync: false
       - key: ADMIN_EMAILS
         sync: false
+      - key: ALLOW_TEST_CREDIT
+        value: "false"
 
   - type: keyvalue
     name: fieldyield-redis

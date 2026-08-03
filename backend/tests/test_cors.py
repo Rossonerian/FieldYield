@@ -38,7 +38,8 @@ def test_protected_route_unauthorized_response_keeps_cors_headers(client):
     )
 
     assert response.status_code == 401
-    assert response.json() == {"detail": "Unauthorized"}
+    assert response.json()["detail"] == "Unauthorized"
+    assert response.json()["request_id"]
     assert response.headers["access-control-allow-origin"] == ALLOWED_ORIGIN
     assert response.headers["access-control-allow-credentials"] == "true"
 
@@ -51,7 +52,8 @@ def test_invalid_login_is_401_and_keeps_cors_headers(client):
     )
 
     assert response.status_code == 401
-    assert response.json() == {"detail": "Invalid credentials"}
+    assert response.json()["detail"] == "Invalid credentials"
+    assert response.json()["request_id"]
     assert response.headers["access-control-allow-origin"] == ALLOWED_ORIGIN
     assert response.headers["access-control-allow-credentials"] == "true"
 
