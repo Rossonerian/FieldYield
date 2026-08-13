@@ -43,6 +43,7 @@ does not call the Market Engine and never receives service credentials.
 - [Database flow](./database-flow.md) — models, migration chain, constraints, transactions, and data integrity.
 - [Deployment and operations](./deployment-and-operations.md) — Vercel, Render, Supabase, variables, smoke checks, and incident handling.
 - [Known issues and fixes](./known-issues-and-fixes.md) — prioritized evidence-based backlog with owners and validation.
+- [Operations runbook](../operations-runbook.md) — backup/restore, rotation, smoke tests, incident response, and external enablement.
 - [Market Engine contract](../market-engine-contract.md) — the external service boundary and unavailable capabilities.
 
 ## Entry points

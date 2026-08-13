@@ -47,28 +47,26 @@ export function AssetPage({ player, variant, tradeSide, setTradeSide, setVariant
         </div>
       </div>
       <BlurFade delay={0.2}><GlassCard><CardTitle title="Dividend History" /><div className="fy-empty"><strong>No dividend history</strong><span>No backend dividend records are available for this asset.</span></div></GlassCard></BlurFade>
-      <div className="fy-mobile-action-bar"><TradeButton type="buy" onClick={() => { setTradeSide('buy'); setModal('buy'); }}>Buy</TradeButton><TradeButton type="sell" aria-pressed={tradeSide === 'sell'} onClick={() => setTradeSide('sell')}>Sell</TradeButton></div>
+      <div className="fy-mobile-action-bar"><TradeButton type="buy" onClick={() => { setTradeSide('buy'); setModal('buy'); }}>Buy</TradeButton><TradeButton type="sell" aria-pressed={tradeSide === 'sell'} onClick={() => { setTradeSide('sell'); setModal('sell'); }}>Sell</TradeButton></div>
     </div>
   );
 }
 
 function TradingPanel({ player, side, setSide, setModal }: { player: Player; side: 'buy' | 'sell'; setSide: (side: 'buy' | 'sell') => void; setModal: (modal: ModalName) => void }) {
   const [order, setOrder] = useState('Market');
-  const [sellReviewed, setSellReviewed] = useState(false);
 
   return (
     <BlurFade delay={0.14}><GlassCard className="fy-trading-panel">
-      <div className="fy-trade-tabs"><TradeButton type="buy" aria-pressed={side === 'buy'} onClick={() => { setSide('buy'); setSellReviewed(false); }}>Buy</TradeButton><TradeButton type="sell" aria-pressed={side === 'sell'} onClick={() => setSide('sell')}>Sell</TradeButton></div>
+      <div className="fy-trade-tabs"><TradeButton type="buy" aria-pressed={side === 'buy'} onClick={() => setSide('buy')}>Buy</TradeButton><TradeButton type="sell" aria-pressed={side === 'sell'} onClick={() => setSide('sell')}>Sell</TradeButton></div>
       <div className="fy-pill-row">{['Market', 'Limit', 'Stop', 'Take Profit'].map((entry, index) => <Button key={entry} variant="filter" size="sm" aria-pressed={order === entry} onClick={() => setOrder(entry)}>{index ? <Lock size={12} /> : null}{entry}</Button>)}</div>
       {order !== 'Market' && <div className="fy-upsell"><Lock size={16} /> {order} orders are available on Pro+. Set target/trigger price after upgrade.</div>}
-      <label className="fy-field-label">Shares <Input defaultValue="2.0" inputMode="decimal" /></label>
-      {order !== 'Market' && <label className="fy-field-label">Target / Trigger Price <Input placeholder="Gold target" inputMode="decimal" /></label>}
+      <label className="fy-field-label" htmlFor="asset-order-shares">Shares <Input id="asset-order-shares" defaultValue="2.0" inputMode="decimal" /></label>
+      {order !== 'Market' && <label className="fy-field-label" htmlFor="asset-order-target">Target / Trigger Price <Input id="asset-order-target" placeholder="Gold target" inputMode="decimal" /></label>}
       <div className="fy-quote-line"><span>Price/sh</span><strong><CurrencyAmount>{player.price}</CurrencyAmount></strong></div>
       <div className="fy-quote-line"><span>Total</span><strong><CurrencyAmount>{(player.price * 2).toFixed(2)}</CurrencyAmount></strong></div>
       {side === 'buy'
         ? <TradeButton type="buy" className="fy-trade-review" onClick={() => setModal('buy')}>Review Order →</TradeButton>
-        : <TradeButton type="sell" className="fy-trade-review" disabled={sellReviewed} onClick={() => setSellReviewed(true)}>{sellReviewed ? 'Sell Reviewed' : 'Review Sell →'}</TradeButton>}
-      {sellReviewed && <p className="fy-confirmation-note" role="status">Sell review confirmed in this frontend session. No holding or balance was changed.</p>}
+        : <TradeButton type="sell" className="fy-trade-review" onClick={() => setModal('sell')}>Review Sell →</TradeButton>}
       <Badge variant="success">Spread 0.7% tight</Badge>
     </GlassCard></BlurFade>
   );

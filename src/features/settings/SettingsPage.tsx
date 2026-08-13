@@ -24,11 +24,11 @@ export function SettingsPage({ token, user, onUpdated, onLogout }: { token: stri
       <BlurFade delay={0.08}><GlassCard className="fy-settings-panel">
         <h2>{section}</h2>
         {section === 'Account' && <>
-          <label className="fy-field-label">Username <Input maxLength={32} value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} /></label>
-          <label className="fy-field-label">First name <Input maxLength={80} value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} /></label>
-          <label className="fy-field-label">Last name <Input maxLength={80} value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} /></label>
-          <label className="fy-field-label">Country <Input maxLength={2} value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value.toUpperCase() })} /></label>
-          <label className="fy-field-label">Email <Input type="email" value={user.email} readOnly /></label>
+          <label className="fy-field-label" htmlFor="settings-username">Username <Input id="settings-username" maxLength={32} value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} /></label>
+          <label className="fy-field-label" htmlFor="settings-first-name">First name <Input id="settings-first-name" maxLength={80} value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} /></label>
+          <label className="fy-field-label" htmlFor="settings-last-name">Last name <Input id="settings-last-name" maxLength={80} value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} /></label>
+          <label className="fy-field-label" htmlFor="settings-country">Country <Input id="settings-country" maxLength={2} value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value.toUpperCase() })} /></label>
+          <label className="fy-field-label" htmlFor="settings-email">Email <Input id="settings-email" type="email" value={user.email} readOnly /></label>
           <p className="fy-muted">Member since {new Date(user.created_at).toLocaleDateString()}</p>
           <p className="fy-muted">Age verification: {user.age_verified ? 'Verified' : 'Required'}</p>
           <p className="fy-muted">Signup bonus: {user.signup_bonus_awarded ? 'Granted once' : 'Not granted'}</p>

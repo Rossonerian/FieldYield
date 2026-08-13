@@ -8,7 +8,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type KeyboardEvent,
   type ReactNode,
 } from 'react';
 import {
@@ -191,16 +190,6 @@ export function CardCarousel({
     return () => viewport.removeEventListener('wheel', handleWheel);
   }, [moveBy]);
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.currentTarget !== event.target) return;
-
-    if (event.key === 'ArrowLeft' && moveBy(-1)) {
-      event.preventDefault();
-    } else if (event.key === 'ArrowRight' && moveBy(1)) {
-      event.preventDefault();
-    }
-  };
-
   const handleDragStart = () => {
     animationRef.current?.stop();
     tiltAnimationRef.current?.stop();
@@ -251,8 +240,6 @@ export function CardCarousel({
         'fieldyield-card-carousel grid min-w-0 gap-3 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-[var(--pink)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--canvas)]',
         className,
       )}
-      onKeyDown={handleKeyDown}
-      tabIndex={0}
     >
       <div className="flex min-w-0 items-center justify-between gap-3">
         <h2 id={titleId} className="m-0 min-w-0 text-base font-semibold text-[var(--text)] sm:text-lg">

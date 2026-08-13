@@ -31,7 +31,7 @@ export function Markets({ openAsset, onBuy, players }: MarketsProps) {
       return true;
     })
     .filter((player) => `${player.name} ${player.ticker} ${player.club}`.toLowerCase().includes(query.trim().toLowerCase()))
-    .sort((left, right) => descending ? right.price - left.price : left.price - right.price), [descending, league, position, price, query]);
+    .sort((left, right) => descending ? right.price - left.price : left.price - right.price), [descending, league, players, position, price, query]);
 
   return (
     <div className="fy-screen fy-markets-screen">

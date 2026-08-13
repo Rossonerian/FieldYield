@@ -18,22 +18,21 @@ backend route.
 
 `App` now treats authentication as explicit states:
 `unauthenticated`, `authenticating`, `authenticated_syncing`,
-`profile_incomplete`, `ready`, `suspended`, `auth_error`, and `sync_error`.
+`profile_incomplete`, `ready`, `suspended`, and `sync_error`.
 Protected dashboard content and private data loaders run only in `ready`.
 `profile_incomplete`, `suspended`, and `sync_error` are visible user states,
 not implicit returns to the login form.
 
 ## Authentication restoration
 
-1. `App` reads the local compatibility token key
-   `fieldyield.authToken` from `localStorage`.
+1. Only when Supabase is not configured, `App` reads the explicit local-mode
+   token key `fieldyield.localAuthToken` from `localStorage`.
 2. When the public Supabase variables are present, `src/lib/supabase.ts`
    creates a client with persisted sessions, token refresh, URL detection, and
    the implicit OAuth flow.
 3. `App` calls `supabase.auth.getSession()` and subscribes to
-   `onAuthStateChange`. A Supabase access token is copied to the compatibility
-   key only after a valid session exists so the existing API client can use one
-   bearer-token path.
+   `onAuthStateChange`. Supabase owns persistence; FieldYield keeps the access
+   token only in React state and never duplicates it into its local token key.
 4. `fetchCurrentUser` calls `GET /api/v1/users/me`. A valid Supabase token must
    already be linked to `users.auth_provider_id`.
 5. For a new Supabase identity, `App` calls `supabase.auth.getUser()` and the
@@ -41,12 +40,12 @@ not implicit returns to the login form.
    birth is treated as profile completion rather than as a silent logout.
    Duplicate session events are guarded by a single-flight sync keyed to the
    active token; stale sync results are ignored after logout or token changes.
-6. On logout, Supabase signs out when configured, the compatibility token is
-   removed, local user data is cleared, and the shell returns to `AuthPage`.
+6. On logout, Supabase signs out when configured, local-only state is removed,
+   account resources are cleared, and the shell returns to `AuthPage`.
 
-Supabase persists its own session in browser storage. The FieldYield token key
-is a convenience for the existing API client; it is not an authority and is
-never accepted without server-side verification.
+Supabase persists its own session. Pending date-of-birth/username data is kept
+in `sessionStorage` for at most 30 minutes and removed on completion, expiry,
+or logout. It is not copied into durable `localStorage`.
 
 ## Email/password and Google OAuth
 
@@ -77,13 +76,13 @@ role or bypass suspension.
 ## API client conventions
 
 `src/lib/api.ts` derives the origin from `VITE_API_BASE_URL` and removes a
-trailing slash. `apiGet`, `apiGetWithToken`, `apiPost`, and `apiPatch` send
+trailing slash. The centralized typed request function sends
 JSON and `Accept` headers, attach `Authorization: Bearer <token>` for private
 calls, parse `{ detail, request_id }` errors, and throw `ApiError` with the
 HTTP status for non-2xx responses. 401 signs out safely; 403 shows suspended,
 age-verification, or authorization state; profile-sync failures are retryable
-without destroying a valid Supabase session. There is no automatic retry or
-global query cache.
+without destroying a valid Supabase session. Abort signals and a 10-second
+timeout prevent stale requests from updating state.
 
 The current UI uses bounded requests:
 
@@ -92,12 +91,14 @@ The current UI uses bounded requests:
   rows in the default client calls.
 - Holdings are bounded by the API at 500 rows.
 
-Components show inline error or empty states. A failed secondary dashboard
-request is isolated with a fallback empty list; a failed authenticated profile
-request causes session recovery/sync or logout. Trading dialogs disable submit
-while a request is pending and send a client-generated idempotency key. The
-backend, not the browser animation or local state, decides whether a trade
-succeeded.
+`useAccountData` refreshes wallet, summary, holdings, orders, squad, watchlist,
+and notifications with `Promise.allSettled`. Successful resources are retained
+when another fails, and failed resources expose retryable errors instead of
+becoming fake zero/empty values. Mutations invalidate only the relevant set.
+Trading dialogs disable double submission and create one UUID per intent; it
+survives transport retries, changes with player/side/quantity, and clears on
+authoritative success or cancellation. The backend decides success and returns
+the execution price/total shown by the dialog.
 
 ## Data flow by feature
 
@@ -106,7 +107,7 @@ succeeded.
 | Dashboard | `users/me/summary`, wallet, notifications, market prices, watchlist | Card grouping, labels, initials, empty-state copy, filtered views |
 | Markets | `GET /api/v1/market/prices` | Search/filter/sort state and responsive card layout |
 | Portfolio | `GET /api/v1/portfolio/holdings` and profile summary | Market-value formatting, holding cards, local filter state |
-| Squad | `GET /api/v1/squad`, promote/demote endpoints | Active/reserve grouping and position presentation |
+| Squad | `GET /api/v1/squad/state`, promote/demote endpoints | Active/reserve grouping and position presentation |
 | Watchlist | `GET/POST/DELETE /api/v1/watchlists` | Delete confirmation and status presentation |
 | Notifications | `GET /api/v1/notifications`, read endpoint | Notification icon/status mapping and unread count |
 | Settings | `GET/PATCH /api/v1/users/me`, admin list/status endpoints for admins | Form state, validation copy, section tabs |
@@ -117,6 +118,13 @@ The frontend does not ship production player fixtures, balances, order history,
 or notification records. When the API returns no catalog or holdings, the UI
 renders an empty state. It does not synthesize historical portfolio charts;
 there is no historical chart API in the current backend.
+
+Screen-level views and nonessential dialogs are lazy-loaded behind the existing
+empty-state loading treatment. `ErrorBoundary` provides a safe reload path for
+render failures. Dialogs trap focus, inert the application root, close on Escape
+or backdrop, and restore their trigger. The notification drawer remains a
+non-modal complementary region. Reduced-motion preferences continue to disable
+nonessential transitions.
 
 ## Environment variables
 

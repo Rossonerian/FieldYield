@@ -1,21 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { WalletIcon } from '@/components/ui/wallet';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { CurrencyIcon } from '@/components/ui/currency-icon';
 import { CardTitle, GlassCard, PlayerTable } from '@/components/shared/field-components';
 import type { Player } from '@/data/fieldyield';
 import { AnimatedIcon } from '@/components/ui/animated-icon';
-import { fetchHoldings, type ProfileSummary } from '@/lib/api';
+import type { HoldingEntry, ProfileSummary } from '@/lib/api';
 
-export function Portfolio({ openAsset, onBuy, summary }: { openAsset: (player: Player) => void; onBuy: (player: Player) => void; summary: ProfileSummary | null }) {
+export function Portfolio({ openAsset, onBuy, summary, holdings: holdingEntries, error }: { openAsset: (player: Player) => void; onBuy: (player: Player) => void; summary: ProfileSummary | null; holdings: HoldingEntry[]; error?: string }) {
   const [holdingsFilter, setHoldingsFilter] = useState('All');
-  const [holdings, setHoldings] = useState<Player[]>([]);
-  const [error, setError] = useState('');
-  useEffect(() => {
-    const token = window.localStorage.getItem('fieldyield.authToken');
-    if (!token) return;
-    fetchHoldings(token).then((entries) => setHoldings(entries.map((entry) => ({ ticker: entry.symbol, name: entry.name, club: entry.club, league: entry.league, price: entry.market_price, change: null, volume: null, yield: null, owned: entry.quantity, status: 'Open', photo: entry.name.slice(0, 2).toUpperCase() })))).catch(() => setError('Could not load your holdings.'));
-  }, []);
+  const holdings = useMemo(() => holdingEntries.map((entry) => ({ ticker: entry.symbol, name: entry.name, club: entry.club, league: entry.league, price: entry.market_price, change: null, volume: null, yield: null, owned: entry.quantity, status: 'Open', photo: entry.name.slice(0, 2).toUpperCase() } satisfies Player)), [holdingEntries]);
   const filteredHoldings = useMemo(() => holdings.filter((player) => {
     if (holdingsFilter === 'Active') return (player.owned ?? 0) > 0;
     if (holdingsFilter === 'Reserve') return false;

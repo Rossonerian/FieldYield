@@ -35,7 +35,7 @@ const SearchIcon = forwardRef<SearchIconHandle, SearchIconProps>(
         if (isControlledRef.current) {
           onMouseEnter?.(e);
         } else if (animateOnHover) {
-          controls.start("animate");
+          void controls.start("animate");
         }
       },
       [animateOnHover, controls, onMouseEnter]
@@ -46,7 +46,7 @@ const SearchIcon = forwardRef<SearchIconHandle, SearchIconProps>(
         if (isControlledRef.current) {
           onMouseLeave?.(e);
         } else if (animateOnHover) {
-          controls.start("normal");
+          void controls.start("normal");
         }
       },
       [animateOnHover, controls, onMouseLeave]

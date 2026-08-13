@@ -1,4 +1,4 @@
-import { useState, type ComponentProps, type KeyboardEvent, type ReactNode } from 'react';
+import { useState, type ComponentProps, type ReactNode } from 'react';
 import { Star, X } from 'lucide-react';
 import type { Player } from '@/data/fieldyield';
 import { Avatar } from '@/components/ui/avatar';
@@ -56,31 +56,17 @@ type PlayerTableProps = {
 };
 
 export function PlayerTable({ entries, openAsset, compact = false, onBuy }: PlayerTableProps) {
-  const activateRow = (event: KeyboardEvent<HTMLTableRowElement>, player: Player) => {
-    if (event.currentTarget !== event.target) return;
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      openAsset(player, player.status === 'Frozen' ? 'circuit' : 'normal');
-    }
-  };
-
   return (
-    <div className="fy-table-wrap" role="region" aria-label="Scrollable football asset table" tabIndex={0} data-carousel-wheel-native onPointerDown={(event) => event.stopPropagation()}>
+    <div className="fy-table-wrap" role="region" aria-label="Scrollable football asset table" data-carousel-wheel-native onPointerDown={(event) => event.stopPropagation()}>
       <table className="fy-data-table">
         <caption className="fy-sr-only">Football asset prices, movement, dividend yield, and actions</caption>
         <thead>
-          <tr><th>#</th><th>Ticker</th><th>Player</th><th>League</th>{!compact && <th>Position</th>}<th>Price</th><th>24h Δ%</th>{!compact && <th>Div Yield</th>}<th>Actions</th></tr>
+          <tr><th scope="col">#</th><th scope="col">Ticker</th><th scope="col">Player</th><th scope="col">League</th>{!compact && <th scope="col">Position</th>}<th scope="col">Price</th><th scope="col">24h Δ%</th>{!compact && <th scope="col">Div Yield</th>}<th scope="col">Actions</th></tr>
         </thead>
         <tbody>
           {entries.map((player, index) => (
-            <tr
-              key={player.ticker}
-              tabIndex={0}
-              onKeyDown={(event) => activateRow(event, player)}
-              onClick={() => openAsset(player, player.status === 'Frozen' ? 'circuit' : 'normal')}
-              aria-label={`Open ${player.name}`}
-            >
-              <td>{index + 1}</td>
+            <tr key={player.ticker}>
+              <th scope="row">{index + 1}</th>
               <td><Badge>{player.ticker}</Badge></td>
               <td><span className="fy-player-cell"><Avatar name={player.name} fallback={player.photo ?? undefined} size="sm" showStatus={false} decorative />{player.name}</span></td>
               <td>{player.league}</td>
@@ -89,8 +75,8 @@ export function PlayerTable({ entries, openAsset, compact = false, onBuy }: Play
               <td>{player.change == null ? 'Not available' : <BadgeDelta value={`${Math.abs(player.change)}%`} deltaType={getDeltaType(player.change)} />}</td>
               {!compact && <td>{player.yield ?? 'Not available'}</td>}
               <td className="fy-row-actions">
-                <Button size="sm" variant="secondary" onClick={(event) => { event.stopPropagation(); openAsset(player); }}>Open Asset</Button>
-                <TradeButton type="buy" onClick={(event) => { event.stopPropagation(); onBuy?.(player); }}>Buy</TradeButton>
+                <Button size="sm" variant="secondary" onClick={() => openAsset(player)}>Open Asset</Button>
+                {onBuy && <TradeButton type="buy" onClick={() => onBuy(player)}>Buy</TradeButton>}
               </td>
             </tr>
           ))}

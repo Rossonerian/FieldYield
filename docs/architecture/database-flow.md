@@ -72,10 +72,11 @@ implemented, so operators must preserve transaction/audit history.
   unique provider/email/username errors roll back and are mapped to safe 409s.
 - Bonus grants lock the wallet, use a deterministic user key, and are guarded
   by unique user/key constraints. Existing users are not retroactively paid.
-- Market orders lock the current price, wallet, and holding rows where the
-  database supports row locks; balance, holding, match, ledger, order, and
-  notification changes commit together. Rejected orders are recorded with a
-  failure reason.
+- Market orders lock the user first, then current price, wallet, and holding.
+  This prevents PostgreSQL foreign-key/row-lock inversion and serializes wallet
+  and capacity decisions. Balance, holding, match, ledger, order, and
+  notification changes commit together. Pre-execution rejections roll back the
+  pending order and leave no financial or notification side effects.
 - Admin status updates and catalog imports commit their data plus audit row in
   one transaction.
 
@@ -86,7 +87,7 @@ settlement remains Decimal/SQL-side; frontend numbers are presentation only.
 
 | Revision | Purpose |
 | --- | --- |
-| `v1_initial_trading` | Creates the initial users, wallets, catalog, prices, orders, holdings, squads, notifications, and related tables from SQLAlchemy metadata |
+| `v1_initial_trading` | Explicit deterministic operations for the historical users, wallets, catalog, prices, orders, holdings, squads, and notifications schema; it never imports current metadata |
 | `v2_bzzoiro_sports_data` | Historical provider/sports synchronization tables |
 | `v3_user_profiles_bonus` | Adds compact profile fields, account status, preferences, timestamps, and bonus marker |
 | `v4_remove_live_notebook` | Safely removes the obsolete sports/notebook tables; downgrade intentionally does not recreate historical data |
@@ -96,9 +97,12 @@ settlement remains Decimal/SQL-side; frontend numbers are presentation only.
 | `v8_market_price_source` | Adds source metadata for imported market prices |
 | `v9_supabase_rls_guard` | Enables PostgreSQL RLS for direct Supabase API access; direct `anon`/`authenticated` access is deny-by-default while FastAPI remains the application authority |
 | `v10_auth_provider` | Records `local`, `email`, or `google` provider classification without duplicating OAuth profile data |
+| `v11_transaction_integrity` | Backfills nullable values, scopes order/credit keys per user, and adds financial/domain constraints, execution uniqueness, and composite indexes; intentionally irreversible |
 
-Migrations are validated with `alembic upgrade head` and `alembic check` on a
-safe test database. PostgreSQL-specific RLS statements are skipped on SQLite.
+Migrations are validated with `alembic upgrade head` and `alembic check` on
+empty SQLite and PostgreSQL databases. PostgreSQL-specific RLS statements are
+skipped on SQLite. Render startup wraps the upgrade in a session-level
+PostgreSQL advisory lock so multiple instances cannot migrate concurrently.
 Because `v4` is destructive and its downgrade is intentionally a no-op, take
 a database backup and rehearse upgrades before production rollout.
 

@@ -8,7 +8,7 @@ export type Screen =
   | 'settings';
 
 export type AssetVariant = 'normal' | 'circuit' | 'risk' | 'retired';
-export type ModalName = 'buy' | 'coins' | 'dividend' | null;
+export type ModalName = 'buy' | 'sell' | 'coins' | 'dividend' | null;
 
 export type Player = {
   ticker: string;
@@ -21,6 +21,6 @@ export type Player = {
   volume?: string | null;
   yield?: string | null;
   owned?: number | null;
-  status?: 'Open' | 'Split Queued' | 'League Status At Risk' | 'Frozen' | string | null;
+  status?: string | null;
   photo?: string | null;
 };

@@ -1,145 +1,85 @@
-# Known issues and fixes
+# Known issues and verified fixes
 
-This is an evidence-based backlog for the code and deployed configuration
-audited on 2026-07-27. “Fixed” means the repository contains the change and a
-local/deployed check was run; it does not mean an external provider has been
-configured.
+Audit date: 2026-08-13. “Fixed” below means implemented and verified in the
+repository. It does not assert that an external provider or live deployment
+has been configured.
 
-## Prioritized backlog
+## Open external and product dependencies
 
-### P1 — External Market Engine contract is incomplete
+### P1 — External Market Engine settlement is intentionally disabled
 
-- **Symptom:** Render health reports `market_engine: not_configured`; FieldYield
-  does not have an external catalog/price/reconciliation flow.
-- **Evidence:** `backend/app/integrations/market_engine.py`,
-  `docs/market-engine-contract.md`, and `GET /health`.
-- **Impact:** The external engine cannot be treated as authoritative for live
-  settlement, fills, balances, or price synchronization.
-- **Recommended fix:** The Market Engine owner must agree to versioned service
-  authentication, catalog/prices, idempotent order/cancel responses, signed
-  reconciliation events, stable errors, and replay behavior. Implement the
-  adapter contract tests in FieldYield before enabling it.
-- **Type/owner:** External contract plus FieldYield adapter; external Market
-  Engine developer and FieldYield backend owner.
-- **Validation:** Health readiness, mocked adapter contract tests, sandbox order
-  lifecycle, reconciliation replay, and failure/timeout tests.
+`MARKET_ENGINE_TRADING_ENABLED=true` is rejected by configuration validation.
+The external contract still lacks a proven catalog, price, acceptance, fill,
+cancellation, reconciliation, authentication, and replay lifecycle. FieldYield
+therefore executes only its closed-loop SQL market orders. Enablement requires
+the checklist in `docs/operations-runbook.md` and sandbox contract tests; no
+repository fallback may claim external success.
 
-### P1 — Catalog and price ingestion is manual
+### P1 — Production catalog ingestion remains operator-driven
 
-- **Symptom:** Production startup never seeds assets; markets are empty until
-  an administrator imports bounded catalog/price records.
-- **Evidence:** `GET /api/v1/market/prices`,
-  `POST /api/v1/admin/catalog/import`, `backend/app/main.py`, and the absence of
-  an ingestion worker/provider route.
-- **Impact:** Prices can become stale or unavailable; the current API has no
-  freshness SLA or automatic source reconciliation.
-- **Recommended fix:** Add a real provider/Market Engine sync boundary after
-  its contract exists. Store source and update timestamps, reject stale or
-  conflicting updates, and alert operators instead of falling back to fake
-  data.
-- **Type/owner:** Code plus external contract; FieldYield/external provider.
-- **Validation:** Duplicate/malformed input tests, source freshness checks,
-  replay/idempotency tests, and a production catalog smoke test.
+The bounded admin catalog import is the only implemented source. The API stores
+source/timestamps and refuses to trade on missing, stale, or future-skewed
+prices, but it cannot make data fresh. A real provider contract, scheduled
+ingestion, reconciliation, and freshness alert must be implemented before a
+continuous market is promised.
 
-### P1 — Preview OAuth and API CORS need an explicit environment policy
+### P1 — Provider configuration and recovery are external
 
-- **Symptom:** Backend `FRONTEND_URL` is validated to exactly
-  `https://field-yield.vercel.app`; a Vercel Preview origin is not allowed by
-  the current production configuration.
-- **Evidence:** `backend/app/core/config.py`, CORS setup in
-  `backend/app/main.py`, and `VITE_SITE_URL` handling in
-  `src/lib/supabase.ts`.
-- **Impact:** Preview builds can be served but cannot safely call the strict
-  production API unless a separate Preview API/configuration is provided.
-- **Recommended fix:** Decide whether Preview uses a separate Render service
-  and Supabase redirect allowlist, or keep Preview UI-only. Do not broaden the
-  production origin to `*` or an unbounded wildcard.
-- **Type/owner:** Configuration/deployment decision; FieldYield + Vercel +
-  Render + Supabase.
-- **Validation:** Preview OAuth redirect, preflight, protected request, and
-  logout tests with the approved preview origin.
+The repository cannot prove Render backups, a restore drill, Supabase email or
+Google provider settings, Google OAuth consent, production secrets, live CORS,
+or Vercel/Render availability. Operators must perform and record the runbook
+checks. Preview environments need a separate explicit API/CORS/Supabase policy;
+the production API deliberately accepts only the production frontend origin.
 
-### P1 — Admin bootstrap configuration is external to the repository
+### P2 — Historical market data is not implemented
 
-- **Symptom:** `ADMIN_EMAILS` defaults to empty, so no configured email is an
-  administrator unless its persisted role is already `admin`.
-- **Evidence:** `Settings.configured_admin_emails`, `admin_user`, and
-  `render.yaml` marks `ADMIN_EMAILS` as `sync: false`.
-- **Impact:** Admin catalog import, user status, and audit endpoints may be
-  unavailable after a fresh deployment; hardcoding an administrator would be
-  unsafe.
-- **Recommended fix:** Configure a controlled administrator address in Render
-  and document the bootstrap/rotation procedure. Keep the value server-only.
-- **Type/owner:** Configuration/operational procedure; Render/FieldYield owner.
-- **Validation:** Normal-user 403, configured-admin success, suspension audit,
-  and removal/rotation check.
+No history source or storage contract exists, so chart/stat/dividend/schedule
+views remain truthful empty states. Do not derive trend or dividend claims from
+the current quote. Implement retention, provenance, bounded queries, and a real
+provider before enabling these features.
 
-### P1 — Production backup and migration rehearsal are not automated
+### P2 — External metrics and alert delivery remain operational work
 
-- **Symptom:** Alembic is authoritative, but backup/restore and staging
-  rehearsal are operator procedures; `v4_remove_live_notebook` has a no-op
-  downgrade.
-- **Evidence:** `backend/start.sh`, `backend/alembic/versions/v4_remove_live_notebook.py`,
-  and Render configuration.
-- **Impact:** A bad migration or restore failure could cause downtime or data
-  loss.
-- **Recommended fix:** Configure Render PostgreSQL backups, test restores, and
-  run migrations against a staging clone before production. Keep financial
-  history immutable.
-- **Type/owner:** Operational procedure; Render/database operator.
-- **Validation:** Restore drill, `alembic upgrade head`, schema diff, and
-  rollback rehearsal on non-production data.
+The API emits redacted request-ID logs, audit rows, readiness, and distributed
+Redis rate limits. This repository does not configure a log drain, paging
+destination, retention policy, or managed alert. Readiness and error-rate alerts
+must be connected and tested by the deployment owner.
 
-### P2 — Rate limiting and external observability are absent
+## Fixed in this hardening pass
 
-- **Symptom:** The API has request logging and audit rows but no application
-  rate limiter, metrics export, alerting, or structured log retention policy.
-- **Evidence:** `backend/app/main.py`, `backend/requirements.txt`, and the
-  absence of rate-limit/metrics middleware.
-- **Impact:** Brute-force auth, abusive catalog requests, and degraded provider
-  behavior may be detected late.
-- **Recommended fix:** Add an infrastructure/API-gateway rate limit for auth
-  and admin routes, plus redacted structured logs and health/error alerts.
-- **Type/owner:** Code/infrastructure; FieldYield + Render.
-- **Validation:** Rate-limit integration tests, redaction review, and alert
-  delivery test.
+- Order and wallet idempotency are per-user, payload-bound, length-bounded, and
+  concurrency-safe. Same keys cannot cross users or duplicate side effects.
+- PostgreSQL account mutations take the user lock before foreign-key inserts,
+  eliminating the deadlock discovered by genuine concurrent tests.
+- Missing/stale/future prices and missing wallets fail with controlled errors;
+  rejected attempts do not mutate financial state.
+- Decimal settlement, bounded quantities, authoritative fill values, closed
+  position realized P/L, and SQL financial constraints are enforced.
+- Active/Reserve squad state is authoritative, gap-safe, capped, persistent,
+  isolated by user, and cleaned on final-share sales.
+- Buy, sell, watchlist, squad, notification, wallet, and dividend UI flows use
+  centralized account refresh and stable order intent keys.
+- Supabase uses cached asymmetric JWKS validation with explicit algorithms and
+  claims; legacy HS projects use bounded remote verification. Local JWTs are
+  explicit test/development only. Tokens are not raw cache keys.
+- Request bodies, schemas, catalog size, request IDs, CORS, readiness, and Redis
+  rate limits are bounded and tested. Production fails closed if Redis fails.
+- Runtime dependencies are pinned/audited separately from development tools;
+  npm and Python runtime audits pass.
+- The Docker image is Python 3.12.13 digest-pinned and non-root. Render data
+  services are private by default, migrations use a PostgreSQL advisory lock,
+  and Vercel defines CSP/security headers.
+- Alembic v1 is explicit rather than dynamic metadata; v11 scopes idempotency
+  and adds validated constraints/indexes. V11 is intentionally irreversible.
+- Accessibility semantics, focus containment, target sizes, contrast, lazy
+  screen loading, typed API calls, linting, unit tests, Playwright, and CI gates
+  are in place without changing the visual design.
 
-### P2 — Historical chart and market-stat APIs are not implemented
+## Residual risk
 
-- **Symptom:** Portfolio and market screens use current bounded holdings,
-  prices, and derived presentation values; no time-series endpoint exists.
-- **Evidence:** `src/features/dashboard/Dashboard.tsx`,
-  `src/features/portfolio/Portfolio.tsx`, `src/lib/api.ts`, and
-  `backend/app/main.py`.
-- **Impact:** Historical performance, price charts, and reliable trend claims
-  cannot be offered without inventing data.
-- **Recommended fix:** Add a real, bounded historical-price/trade data contract
-  and query only after storage/retention requirements are approved.
-- **Type/owner:** Product/data model decision; FieldYield + external provider.
-- **Validation:** Source timestamp coverage, downsampled API response, empty
-  state, and large-range performance tests.
-
-## Already addressed controls
-
-- **CORS:** The allowed origin is strict, preflight uses all methods/headers,
-  and error responses include CORS headers. This was validated against the live
-  API with approved and unknown origins.
-- **Token exposure:** The built frontend bundle contains no service-role,
-  client-secret, Market Engine key, or localhost API value in the audited scan.
-  Keep this scan in release checks.
-- **Signup bonus:** The server grants the configured bonus transactionally with
-  unique user/idempotency constraints; frontend state cannot claim it.
-- **Suspension/admin boundaries:** Dependencies derive identity from verified
-  tokens and enforce status/role checks server-side. Local tests cover these
-  paths; a production admin smoke test still requires the configured admin
-  address.
-- **Migration authority:** The FastAPI startup `create_all` fallback was
-  removed; Render's Alembic step is now the only production schema creation
-  path. Re-run migration and backend tests after changes.
-
-## External verification still required
-
-Repository tests and HTTP smoke checks do not prove Google consent, Supabase
-redirect settings, Render secret values, PostgreSQL backup recovery, or a real
-Market Engine trade. Those must be verified by the owning operator/provider
-before inviting production users.
+The remaining repository-level risk is low-to-moderate and operational: startup
+migrations are serialized but still run in the web service because the selected
+Render plan has no configured pre-deploy command. A migration failure prevents
+startup; backup and staging rehearsal are mandatory. Provider outage behavior
+is fail-closed for authentication/readiness and therefore may reduce
+availability while preserving authorization correctness.

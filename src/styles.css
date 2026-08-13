@@ -12,7 +12,7 @@
   --mauve: #aa9aa2;
   --green: #76aa85;
   --red: #a94f57;
-  --gold: #ad833c;
+  --gold: #76571d;
   --edge: rgba(39, 77, 62, 0.18);
   --shadow: rgba(38, 61, 51, 0.16);
   --glass-highlight: rgba(255, 255, 255, 0.48);
@@ -301,10 +301,22 @@ body {
   transition: background-color 220ms ease, color 220ms ease, transform 220ms ease;
 }
 
-.fy-auth-mode-switch button[aria-selected="true"] {
+.fy-auth-mode-switch button[aria-pressed="true"] {
   background: rgba(255, 255, 255, 0.88);
   color: #10306a;
   box-shadow: 0 12px 28px rgba(9, 23, 72, 0.22);
+}
+
+@media (pointer: coarse) {
+  .fy-app-header button,
+  .fy-mobile-navigation button,
+  .fy-row-actions button,
+  .fy-watch-row button,
+  .fy-dialog-close,
+  .fy-notification-header button {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }
 
 .fy-auth-form,
@@ -1639,11 +1651,19 @@ body {
   place-items: center;
   overflow-y: auto;
   padding: 20px;
+}
+
+.fy-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  border: 0;
   background: color-mix(in srgb, var(--solid-black) 52%, transparent);
   backdrop-filter: blur(8px);
 }
 
 .fy-dialog-motion {
+  position: relative;
+  z-index: 1;
   width: min(560px, 100%);
   max-width: 100%;
 }

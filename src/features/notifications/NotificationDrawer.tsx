@@ -3,51 +3,28 @@ import { X } from 'lucide-react';
 import { AlertBadge, type AlertState } from '@/components/ui/alert-badge';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { Button } from '@/components/ui/button';
-import { fetchNotifications, markNotificationRead } from '@/lib/api';
+import { markNotificationRead, type NotificationEntry } from '@/lib/api';
 
-type Notification = {
-  id: string;
-  label: string;
-  status: AlertState;
-  text: string;
-  read: boolean;
-};
-
-export function NotificationDrawer({ open, close, token }: { open: boolean; close: () => void; token: string }) {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+export function NotificationDrawer({ open, close, token, notifications, onRead }: { open: boolean; close: () => void; token: string; notifications: NotificationEntry[]; onRead: () => Promise<void> }) {
+  const [error, setError] = useState('');
   const titleId = useId();
   const drawerRef = useRef<HTMLElement>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
-
   useEffect(() => {
     if (!open) return;
-    fetchNotifications(token).then((items) => setNotifications(items.map((item) => ({ id: String(item.id), label: item.kind.replaceAll('_', ' '), status: item.kind.includes('failed') ? 'critical' : item.kind.includes('filled') || item.kind.includes('credit') ? 'success' : 'informational', text: item.message, read: item.read })))).catch(() => setNotifications([]));
     previousFocus.current = document.activeElement as HTMLElement | null;
     window.requestAnimationFrame(() => drawerRef.current?.focus());
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') { event.preventDefault(); close(); }
-    };
+    const handleKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); close(); } };
     document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      previousFocus.current?.focus();
-    };
+    return () => { document.removeEventListener('keydown', handleKeyDown); previousFocus.current?.focus(); };
   }, [close, open]);
-
   if (!open) return null;
-
-  return (
-    <BlurFade className="fy-notification-motion" yOffset={0} blur={5}>
-      <aside ref={drawerRef} tabIndex={-1} className="fy-notification-drawer" role="dialog" aria-modal="false" aria-labelledby={titleId}>
-        <div className="fy-notification-header"><div><h2 id={titleId}>Notifications</h2><span>{notifications.filter((notification) => !notification.read).length} unread updates</span></div><AlertBadge status="new" count={notifications.filter((notification) => !notification.read).length} /><Button size="icon-sm" variant="ghost" onClick={close} aria-label="Close notifications"><X /></Button></div>
-        <div className="fy-notification-list">
-          {notifications.map((notification) => {
-            return <NotificationItem key={notification.id} status={notification.status} label={notification.label} onClick={() => { if (notification.read) return; markNotificationRead(token, Number(notification.id)).then(() => setNotifications((current) => current.map((entry) => entry.id === notification.id ? { ...entry, read: true } : entry))).catch(() => undefined); }}>{notification.text}</NotificationItem>;
-          })}
-        </div>
-      </aside>
-    </BlurFade>
-  );
+  const unread = notifications.filter((entry) => !entry.read).length;
+  return <BlurFade className="fy-notification-motion" yOffset={0} blur={5}><aside ref={drawerRef} tabIndex={-1} className="fy-notification-drawer" aria-labelledby={titleId}>
+    <div className="fy-notification-header"><div><h2 id={titleId}>Notifications</h2><span>{unread} unread updates</span></div><AlertBadge status="new" count={unread} /><Button size="icon-sm" variant="ghost" onClick={close} aria-label="Close notifications"><X /></Button></div>
+    {error && <p className="fy-auth-error" role="alert">{error}</p>}
+    <div className="fy-notification-list">{notifications.map((notification) => <NotificationItem key={notification.id} status={notification.kind.includes('failed') ? 'critical' : notification.kind.includes('filled') || notification.kind.includes('credit') ? 'success' : 'informational'} label={notification.kind.replaceAll('_', ' ')} onClick={notification.read ? undefined : () => { void markNotificationRead(token, notification.id).then(onRead).catch((caught) => setError(caught instanceof Error ? caught.message : 'Could not mark notification as read.')); }}>{notification.message}</NotificationItem>)}</div>
+  </aside></BlurFade>;
 }
 
 export function NotificationItem({ status, label, onClick, children }: { status: AlertState; label: string; onClick?: () => void; children: ReactNode }) {

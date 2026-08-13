@@ -1,5 +1,5 @@
 #!/bin/sh
-set -e
+set -eu
 
-alembic upgrade head
-exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"
+python -m app.migrate
+exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}" --timeout-graceful-shutdown 30

@@ -30,7 +30,10 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
     if (!open) return;
     triggerRef.current = document.activeElement as HTMLElement | null;
     const previousOverflow = document.body.style.overflow;
+    const applicationRoot = document.getElementById('root');
+    const previousInert = applicationRoot?.inert ?? false;
     document.body.style.overflow = 'hidden';
+    if (applicationRoot) applicationRoot.inert = true;
     window.requestAnimationFrame(() => contentRef.current?.querySelector<HTMLElement>(focusableSelector)?.focus());
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -52,6 +55,7 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = previousOverflow;
+      if (applicationRoot) applicationRoot.inert = previousInert;
       triggerRef.current?.focus();
     };
   }, [open]);
@@ -59,7 +63,8 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
   if (!open) return null;
 
   return createPortal(
-    <div className="fy-dialog-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) onOpenChange(false); }}>
+    <div className="fy-dialog-overlay">
+      <button className="fy-dialog-backdrop" type="button" aria-label="Close dialog" onClick={() => onOpenChange(false)} />
       <BlurFade className="fy-dialog-motion" blur={6} yOffset={14}>
         <div
           ref={contentRef}

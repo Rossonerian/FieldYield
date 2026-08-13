@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { App } from '@/app/App';
+import { ErrorBoundary } from '@/app/ErrorBoundary';
 import { ThemeProvider } from '@/context/ThemeContext';
 import '@/styles.css';
 
@@ -12,7 +13,7 @@ if (!root) throw new Error('FieldYield root element was not found.');
 createRoot(root).render(
   <StrictMode>
     <ThemeProvider>
-      <App />
+      <ErrorBoundary><App /></ErrorBoundary>
       <SpeedInsights />
     </ThemeProvider>
   </StrictMode>,

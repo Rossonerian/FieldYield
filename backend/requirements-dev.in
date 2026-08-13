@@ -1,0 +1,8 @@
+-r requirements.in
+pytest==9.0.2
+pytest-cov==7.0.0
+pytest-xdist==3.8.0
+pip-audit==2.9.0
+coverage==7.10.7
+ruff==0.12.12
+pip-tools==7.6.1

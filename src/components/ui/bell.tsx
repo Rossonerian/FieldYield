@@ -41,7 +41,7 @@ const BellIcon = forwardRef<BellIconHandle, BellIconProps>(
         if (isControlledRef.current) {
           onMouseEnter?.(e);
         } else if (animateOnHover) {
-          controls.start("animate");
+          void controls.start("animate");
         }
       },
       [animateOnHover, controls, onMouseEnter]
@@ -52,7 +52,7 @@ const BellIcon = forwardRef<BellIconHandle, BellIconProps>(
         if (isControlledRef.current) {
           onMouseLeave?.(e);
         } else if (animateOnHover) {
-          controls.start("normal");
+          void controls.start("normal");
         }
       },
       [animateOnHover, controls, onMouseLeave]

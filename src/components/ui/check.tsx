@@ -57,7 +57,7 @@ const CheckIcon = forwardRef<CheckIconHandle, CheckIconProps>(
         if (isControlledRef.current) {
           onMouseEnter?.(e);
         } else if (animateOnHover) {
-          controls.start("animate");
+          void controls.start("animate");
         }
       },
       [animateOnHover, controls, onMouseEnter]
@@ -68,7 +68,7 @@ const CheckIcon = forwardRef<CheckIconHandle, CheckIconProps>(
         if (isControlledRef.current) {
           onMouseLeave?.(e);
         } else if (animateOnHover) {
-          controls.start("normal");
+          void controls.start("normal");
         }
       },
       [animateOnHover, controls, onMouseLeave]

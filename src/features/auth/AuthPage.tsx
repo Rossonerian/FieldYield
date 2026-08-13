@@ -1,7 +1,7 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { ArrowRight, Check, Chrome, Circle, LockKeyhole, Sparkles } from 'lucide-react';
 import { fetchCurrentUser, loginUser, registerUser, syncSupabaseUser, type CurrentUser } from '@/lib/api';
-import { clearOAuthUrl, getOAuthRedirectUrl, supabase } from '@/lib/supabase';
+import { clearOAuthUrl, clearPendingProfile, getOAuthRedirectUrl, readPendingProfile, storePendingProfile, supabase } from '@/lib/supabase';
 
 type AuthMode = 'login' | 'register';
 
@@ -23,11 +23,11 @@ export function AuthPage({ onAuthenticated, requiresSupabaseProfile = false }: A
 
   useEffect(() => {
     if (!requiresSupabaseProfile || !supabase) return;
-    supabase.auth.getUser().then(({ data }) => {
+    void supabase.auth.getUser().then(({ data }) => {
       if (data.user?.email) setEmail(data.user.email);
       const metadata = data.user?.user_metadata as { username?: string } | undefined;
       if (metadata?.username) setUsername(metadata.username);
-    });
+    }).catch(() => undefined);
   }, [requiresSupabaseProfile]);
 
   useEffect(() => {
@@ -103,7 +103,7 @@ export function AuthPage({ onAuthenticated, requiresSupabaseProfile = false }: A
         if (!data.session) throw new Error('Your Google session has expired. Please try again.');
         const sync = await syncSupabaseUser(data.session.access_token, { date_of_birth: new Date(`${dateOfBirth}T00:00:00Z`).toISOString(), username });
         if (sync.status !== 'ready' || !sync.user) throw new Error('Your profile still needs required fields.');
-        window.localStorage.removeItem('fieldyield.pendingSupabaseProfile');
+        clearPendingProfile();
         onAuthenticated(data.session.access_token, sync.user);
         return;
       }
@@ -111,10 +111,10 @@ export function AuthPage({ onAuthenticated, requiresSupabaseProfile = false }: A
         if (mode === 'register') {
           const { data, error: signupError } = await supabase.auth.signUp({ email, password, options: { data: { username, date_of_birth: dateOfBirth } } });
           if (signupError) throw signupError;
-          if (!data.session) { window.localStorage.setItem('fieldyield.pendingSupabaseProfile', JSON.stringify({ date_of_birth: new Date(`${dateOfBirth}T00:00:00Z`).toISOString(), username })); setError('Check your email to confirm the account, then sign in.'); return; }
+          if (!data.session) { storePendingProfile({ date_of_birth: new Date(`${dateOfBirth}T00:00:00Z`).toISOString(), username }); setError('Check your email to confirm the account, then sign in.'); return; }
           const sync = await syncSupabaseUser(data.session.access_token, { date_of_birth: new Date(`${dateOfBirth}T00:00:00Z`).toISOString(), username });
           if (sync.status !== 'ready' || !sync.user) throw new Error('Your profile still needs required fields.');
-          window.localStorage.removeItem('fieldyield.pendingSupabaseProfile');
+          clearPendingProfile();
           onAuthenticated(data.session.access_token, sync.user);
           return;
         }
@@ -123,16 +123,12 @@ export function AuthPage({ onAuthenticated, requiresSupabaseProfile = false }: A
         let user: CurrentUser;
         try {
           user = await fetchCurrentUser(data.session.access_token);
-        } catch (caught) {
-          const pending = window.localStorage.getItem('fieldyield.pendingSupabaseProfile');
-          let profile: { date_of_birth?: string; username?: string } = {};
-          if (pending) {
-            try { profile = JSON.parse(pending) as { date_of_birth?: string; username?: string }; } catch { profile = {}; }
-          }
+        } catch {
+          const profile = readPendingProfile() ?? {};
           const sync = await syncSupabaseUser(data.session.access_token, profile);
           if (sync.status !== 'ready' || !sync.user) throw new Error('Date of birth is required to create your profile');
           user = sync.user;
-          window.localStorage.removeItem('fieldyield.pendingSupabaseProfile');
+          clearPendingProfile();
         }
         onAuthenticated(data.session.access_token, user);
         return;
@@ -167,11 +163,11 @@ export function AuthPage({ onAuthenticated, requiresSupabaseProfile = false }: A
           <p>{requiresSupabaseProfile ? 'Add your date of birth to finish setting up your Google account.' : mode === 'login' ? 'Login to continue to the trading dashboard.' : 'Sign up and receive your starter Gold bonus from the backend.'}</p>
         </div>
 
-        {!requiresSupabaseProfile && <div className="fy-auth-mode-switch" role="tablist" aria-label="Authentication mode">
-          <button type="button" role="tab" aria-selected={mode === 'login'} onClick={() => switchMode('login')}>
+        {!requiresSupabaseProfile && <div className="fy-auth-mode-switch" role="group" aria-label="Authentication mode">
+          <button type="button" aria-pressed={mode === 'login'} onClick={() => switchMode('login')}>
             Login
           </button>
-          <button type="button" role="tab" aria-selected={mode === 'register'} onClick={() => switchMode('register')}>
+          <button type="button" aria-pressed={mode === 'register'} onClick={() => switchMode('register')}>
             Sign Up
           </button>
         </div>}

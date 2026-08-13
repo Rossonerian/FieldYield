@@ -1,0 +1,160 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+        env:
+          VITE_API_BASE_URL: https://fieldyield-api.onrender.com
+          VITE_SITE_URL: https://field-yield.vercel.app
+      - run: npm run bundle:report
+      - run: npm run bundle:verify
+      - run: npm audit --audit-level=high
+      - run: npm audit --omit=dev --audit-level=high
+
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      APP_ENV: test
+      DATABASE_URL: sqlite:///./ci-migration.db
+      SECRET_KEY: fieldyield-ci-secret-key-at-least-32-bytes
+      AUTH_PROVIDER: local
+      CORS_ORIGINS: https://field-yield.vercel.app
+      RATE_LIMIT_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m pip check
+      - run: python -m pip_audit -r requirements.txt
+      - run: python -m ruff check app tests
+      - run: python -m pytest -m "not postgres" --cov=app --cov-report=term --cov-report=xml -q
+      - run: python -m alembic upgrade head
+      - run: python -m alembic check
+
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.6-alpine
+        env:
+          POSTGRES_USER: fieldyield
+          POSTGRES_PASSWORD: fieldyield_test
+          POSTGRES_DB: fieldyield_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fieldyield -d fieldyield_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      APP_ENV: test
+      DATABASE_URL: postgresql://fieldyield:fieldyield_test@127.0.0.1:5432/fieldyield_test
+      TEST_DATABASE_URL: postgresql://fieldyield:fieldyield_test@127.0.0.1:5432/fieldyield_test
+      SECRET_KEY: fieldyield-postgres-ci-secret-at-least-32-bytes
+      AUTH_PROVIDER: local
+      CORS_ORIGINS: https://field-yield.vercel.app
+      RATE_LIMIT_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m alembic upgrade head
+      - run: python -m alembic check
+      - run: python -m pytest -m postgres -q
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/secret_scan.py
+      - uses: actions/dependency-review-action@v4
+        if: github.event_name == 'pull_request'
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build production image
+        run: docker build -t fieldyield-api:ci backend
+      - name: Verify image identity and imports
+        run: |
+          test "$(docker image inspect fieldyield-api:ci --format '{{.Config.User}}')" = "fieldyield:fieldyield"
+          docker run --rm --entrypoint python fieldyield-api:ci -c "import app.main, app.migrate"
+      - name: Run container health smoke test
+        run: |
+          docker run -d --name fieldyield-api-ci -p 8000:8000 \
+            -e APP_ENV=test \
+            -e DATABASE_URL=sqlite:////tmp/fieldyield.db \
+            -e SECRET_KEY=fieldyield-container-ci-secret-at-least-32-bytes \
+            -e AUTH_PROVIDER=local \
+            -e CORS_ORIGINS=https://field-yield.vercel.app \
+            -e RATE_LIMIT_ENABLED=false \
+            fieldyield-api:ci
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8000/health/ready; then exit 0; fi
+            sleep 1
+          done
+          docker logs fieldyield-api-ci
+          exit 1
+      - if: always()
+        run: docker rm -f fieldyield-api-ci 2>/dev/null || true
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: npm ci
+      - run: python -m pip install -r backend/requirements.txt
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e

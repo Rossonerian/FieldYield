@@ -5,8 +5,11 @@ services:
     plan: free
     dockerfilePath: backend/Dockerfile
     dockerContext: backend
-    healthCheckPath: /health
+    healthCheckPath: /health/ready
+    autoDeployTrigger: checksPass
     envVars:
+      - key: APP_ENV
+        value: production
       - key: DATABASE_URL
         fromDatabase:
           name: fieldyield-db
@@ -18,8 +21,10 @@ services:
           property: connectionString
       - key: SECRET_KEY
         generateValue: true
-      - key: FRONTEND_URL
+      - key: CORS_ORIGINS
         value: https://field-yield.vercel.app
+      - key: TRUSTED_PROXY_IPS
+        sync: false
       - key: AUTH_PROVIDER
         value: supabase
       - key: SIGNUP_BONUS_ENABLED
@@ -28,6 +33,20 @@ services:
         value: "100"
       - key: SIGNUP_BONUS_SILVER
         value: "0"
+      - key: MARKET_PRICE_MAX_AGE_SECONDS
+        value: "900"
+      - key: MARKET_PRICE_FUTURE_SKEW_SECONDS
+        value: "60"
+      - key: MAX_ORDER_QUANTITY
+        value: "10000"
+      - key: REQUEST_BODY_MAX_BYTES
+        value: "262144"
+      - key: CATALOG_BODY_MAX_BYTES
+        value: "1048576"
+      - key: RATE_LIMIT_ENABLED
+        value: "true"
+      - key: ENABLE_API_DOCS
+        value: "false"
       - key: MARKET_ENGINE_BASE_URL
         sync: false
       - key: MARKET_ENGINE_API_KEY
@@ -42,8 +61,8 @@ services:
         value: https://uewpyfwnuiqjzxahmesz.supabase.co
       - key: SUPABASE_ANON_KEY
         sync: false
-      - key: SUPABASE_SERVICE_ROLE_KEY
-        sync: false
+      - key: SUPABASE_JWT_AUDIENCE
+        value: authenticated
       - key: ADMIN_EMAILS
         sync: false
       - key: ALLOW_TEST_CREDIT
@@ -52,13 +71,12 @@ services:
   - type: keyvalue
     name: fieldyield-redis
     plan: free
-    ipAllowList:
-      - source: 0.0.0.0/0
-        description: Render services
-    maxmemoryPolicy: noeviction
+    ipAllowList: []
+    maxmemoryPolicy: allkeys-lru
 
 databases:
   - name: fieldyield-db
     plan: free
     databaseName: fieldyield
     user: fieldyield
+    ipAllowList: []

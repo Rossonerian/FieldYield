@@ -1,155 +1,103 @@
 # Deployment and operations
 
-## Confirmed topology
+## Repository-defined topology
 
-| Service | Production endpoint/configuration | Responsibility |
+| Service | Repository configuration | Responsibility |
 | --- | --- | --- |
-| Vercel | `https://field-yield.vercel.app` | Builds and serves the Vite `dist/` bundle |
-| Render | `https://fieldyield-api.onrender.com` | Runs the FastAPI Docker service, migrations, and SQL API |
-| Render PostgreSQL | Render-managed `fieldyield-db` connection string | Persistent application data |
-| Render Redis | Render-managed `fieldyield-redis` | Optional Celery/cache acceleration; not financial truth |
-| Supabase | Repository-configured Supabase Auth project URL | Auth identities, Google OAuth, and token validation |
-| Market Engine | External developer-owned service | Optional server-side diagnostic/order adapter only |
+| Vercel | `vercel.json` | `npm ci`, Vite build, SPA routing, browser security headers |
+| Render web | `render.yaml`, `backend/Dockerfile` | Non-root FastAPI/Uvicorn API and serialized Alembic migration |
+| Render PostgreSQL | private `fieldyield-db` | Authoritative application and financial records |
+| Render Key Value | private `fieldyield-redis`, `allkeys-lru` | Distributed rate-limit counters; never financial truth |
+| Supabase | public URL + operator secrets/settings | Production identity authority |
+| Market Engine | external, disabled | No settlement authority until the contract checklist passes |
 
-The external Market Engine repository is not part of this repository's build,
-deployment, or Git history.
+These files describe intended deployment. They do not prove that services,
+backups, provider settings, secrets, or live health have been configured.
 
-## Vercel frontend
+## Vercel
 
-`vercel.json` uses:
+Vercel runs `npm ci` and `npm run build`, serving `dist/`. Configure these
+browser-public values separately for each environment:
+
+| Variable | Production shape |
+| --- | --- |
+| `VITE_API_BASE_URL` | `https://fieldyield-api.onrender.com` (never localhost) |
+| `VITE_SUPABASE_URL` | public Supabase project HTTPS URL |
+| `VITE_SUPABASE_ANON_KEY` | public anon/publishable key only |
+| `VITE_SITE_URL` | exact HTTPS browser origin |
+
+No database URL, signing key, OAuth client secret, service-role key, admin list,
+or Market Engine credential may use `VITE_*`.
+
+`vercel.json` defines CSP, nosniff, strict referrer policy, permissions policy,
+frame denial, same-origin-allow-popups COOP, and HSTS. The pre-paint theme script
+is an external same-origin file, so `script-src` does not need `unsafe-inline`
+or `unsafe-eval`. `style-src 'unsafe-inline'` remains because React/Motion use
+runtime style attributes; scripts stay strict. COEP is intentionally absent to
+avoid breaking OAuth and approved remote images.
+
+## Render
+
+Production validation requires:
 
 ```text
-installCommand: npm install
-buildCommand: npm run build
-outputDirectory: dist
-```
-
-Set these public build variables in Vercel separately for Preview and
-Production:
-
-| Variable | Example placeholder | Notes |
-| --- | --- | --- |
-| `VITE_API_BASE_URL` | `https://fieldyield-api.onrender.com` | No trailing slash; never localhost in Production |
-| `VITE_SUPABASE_URL` | `https://uewpyfwnuiqjzxahmesz.supabase.co` | Public project URL |
-| `VITE_SUPABASE_ANON_KEY` | `<public-supabase-anon-key>` | Public anon key only |
-| `VITE_SITE_URL` | `https://field-yield.vercel.app` | Exact OAuth browser origin for each environment |
-
-Only variables prefixed `VITE_` are compiled into the browser. Never put
-`SUPABASE_SERVICE_ROLE_KEY`, a database URL, signing secret, Google client
-secret, or Market Engine credential in Vercel browser variables.
-
-## Render backend
-
-`render.yaml` builds `backend/Dockerfile`, points the health check at `/health`,
-and supplies PostgreSQL/Redis service connections. `backend/start.sh` runs
-Alembic before Uvicorn, with Render's `PORT` or 8000 as the fallback.
-
-Required server-only variables:
-
-```text
-DATABASE_URL=<render-postgresql-connection-string>
-REDIS_URL=<render-redis-connection-string>
-SECRET_KEY=<generated-server-signing-key>
+APP_ENV=production
+DATABASE_URL=<internal Render PostgreSQL connection>
+REDIS_URL=<internal Render Key Value connection>
+SECRET_KEY=<generated 32+ character secret>
 AUTH_PROVIDER=supabase
-FRONTEND_URL=https://field-yield.vercel.app
-SUPABASE_URL=https://uewpyfwnuiqjzxahmesz.supabase.co
-SUPABASE_ANON_KEY=<server-side-copy-of-public-anon-key>
-SUPABASE_SERVICE_ROLE_KEY=<server-only-service-role-key>
-ADMIN_EMAILS=<approved-admin-email-list>
-SIGNUP_BONUS_ENABLED=true
-SIGNUP_BONUS_GOLD=<configured-integer>
-SIGNUP_BONUS_SILVER=<configured-integer>
-MARKET_ENGINE_BASE_URL=<optional-external-origin>
-MARKET_ENGINE_API_KEY=<optional-server-only-key>
-MARKET_ENGINE_TIMEOUT_MS=3000
-MARKET_ENGINE_VERSION=v1
-MARKET_ENGINE_TRADING_ENABLED=false
+CORS_ORIGINS=https://field-yield.vercel.app
+TRUSTED_PROXY_IPS=<reviewed Render proxy addresses>
+SUPABASE_URL=<project HTTPS URL>
+SUPABASE_ANON_KEY=<public anon/publishable key>
+ADMIN_EMAILS=<reviewed server-only bootstrap list>
 ALLOW_TEST_CREDIT=false
+MARKET_ENGINE_TRADING_ENABLED=false
 ```
 
-The service-role variable is reserved for server-side administration and is
-not currently sent to the browser. `ALLOW_TEST_CREDIT` must remain false in
-production. `MARKET_ENGINE_TRADING_ENABLED` must remain `false` until sandbox
-contract tests prove order/fill/cancellation behavior. Empty `MARKET_ENGINE_*`
-values are intentional until the external contract is complete.
+The environment examples document freshness, request-size, rate-limit, pool,
+bonus, Supabase cache/timeout, and optional adapter values. Production settings
+fail closed if auth, Redis, exact CORS, or secrets are unsafe.
 
-## Supabase Auth and Google
+Both Render data services have `ipAllowList: []`; the web service consumes their
+internal connection strings. `autoDeployTrigger: checksPass` waits for repository
+checks where supported. The selected plan has no repository-configured
+pre-deploy command, so `start.sh` calls `app.migrate`. PostgreSQL takes a stable
+session advisory lock around Alembic, ensuring only one instance migrates at a
+time; migration failure prevents Uvicorn startup. Uvicorn has a 30-second
+graceful shutdown window.
 
-1. Enable Google under Supabase **Authentication → Providers → Google**.
-2. Configure the Google Cloud OAuth authorized redirect URI exactly as
-   `https://uewpyfwnuiqjzxahmesz.supabase.co/auth/v1/callback`, matching the
-   Supabase URL already present in the repository configuration.
-3. Add `https://field-yield.vercel.app` as the production origin and add only
-   explicitly approved local/preview origins.
-4. Set Supabase Site URL to `https://field-yield.vercel.app`.
-5. Use only `openid email profile` scopes.
-6. Keep Google Client Secret inside Supabase provider configuration. It must
-   never be committed or copied to Vercel.
+The image is pinned to Python 3.12.13 and its reviewed multi-architecture digest,
+installs only fully pinned runtime dependencies, excludes tests/dev tools/local
+data, sets read-only application files, and runs as `fieldyield:fieldyield`
+(UID/GID 10001). Its container health check uses `/health/live`; Render uses
+the dependency-aware `/health/ready`.
 
-The browser uses Supabase's implicit flow. The FieldYield backend receives the
-Supabase bearer token, validates it against `/auth/v1/user`, and maps the
-verified Supabase user ID to local records. Supabase provider settings and
-redirect allowlists must be configured independently for local, Preview, and
-Production.
+## Health contract
 
-## Deployment order
+- `/health/live`: always dependency-free 200 while the process can serve.
+- `/health/ready`: 200 only when database and required Supabase/settlement
+  dependencies are healthy; otherwise 503 with component status.
+- `/health`: backward-compatible component payload, not the deployment probe.
 
-1. Back up the Render database and review the Alembic heads.
-2. Configure Render server variables and verify Supabase provider settings.
-3. Deploy the backend; confirm migrations finish before Uvicorn starts.
-4. Check `GET https://fieldyield-api.onrender.com/health` and confirm
-   `database: ok`, `supabase: ok`, and the expected optional
-   `market_engine` state.
-5. Set Vercel public variables and deploy the frontend.
-6. Confirm the deployed bundle contains the Render API origin and no localhost
-   or server-only secrets.
-7. Run the smoke checklist below with a fresh test account.
+Market Engine health is optional while trading is disabled. Redis is exercised
+by rate-limited requests rather than included as a global readiness dependency;
+production requests fail with 503 rather than bypassing protection when Redis
+is unavailable.
 
-## Post-deployment smoke checks
+## Supabase and Google
 
-```bash
-curl -i https://fieldyield-api.onrender.com/health
-curl -i -X OPTIONS https://fieldyield-api.onrender.com/api/v1/users/me \
-  -H 'Origin: https://field-yield.vercel.app' \
-  -H 'Access-Control-Request-Method: GET'
-curl -i https://fieldyield-api.onrender.com/api/v1/users/me \
-  -H 'Origin: https://field-yield.vercel.app'
-curl -I https://field-yield.vercel.app
-```
+The operator must verify Supabase Site URL/redirect allowlists, email provider,
+Google provider, and the exact Google callback
+`<SUPABASE_URL>/auth/v1/callback`. Only `openid email profile` scopes are needed.
+Google client secrets stay in provider configuration. Production FastAPI uses
+JWKS verification for asymmetric tokens and bounded provider verification for
+legacy HS tokens; it never accepts local JWTs as a fallback.
 
-Expected results are health HTTP 200 with truthful component fields, approved
-preflight HTTP 200 with the exact `Access-Control-Allow-Origin`, protected
-request HTTP 401 with CORS headers, and frontend HTTP 200. An unknown origin
-must not receive an allow-origin header.
+## Release and incidents
 
-Then manually verify email/password and Google sign-in, refresh/session
-restoration, logout, profile sync, one-time bonus, admin denial for a normal
-user, and an empty-catalog state. Do not call a successful trade verified until
-the external settlement contract is configured and tested.
-
-## Logs, migration, and rollback
-
-Render logs contain Uvicorn request logs, exception traces, and startup output
-such as the allowed CORS origin. Do not copy tokens or provider payloads into
-logs. Alembic runs on every Render boot; a failed migration should prevent the
-API process from starting. Back up before upgrades and rehearse rollback on a
-staging database because the notebook-removal migration intentionally does not
-recreate historical tables on downgrade.
-
-For an incident, check in order: Vercel build/deploy status, deployed API base
-URL, `/health`, CORS preflight, Supabase provider/redirect settings, Render
-logs, database migration head, and only then the optional Market Engine health
-endpoint. A `market_engine: not_configured` result is an external integration
-status, not a database or authentication failure.
-
-## Security rules
-
-- Never commit `.env`, `.env.local`, Render exports, Supabase keys, OAuth
-  secrets, database URLs, or Market Engine credentials.
-- Treat all `VITE_*` values as public; use Supabase RLS and server validation
-  for authorization.
-- Keep one exact production CORS origin. Preview origins require an explicit
-  configuration decision; do not use `*` or broad wildcards with credentials.
-- Rotate exposed credentials through the owning provider, not through Git.
-- Keep admin bootstrap emails in Render secrets and audit all status/catalog
-  mutations.
+Follow [the operations runbook](../operations-runbook.md) for backup/restore
+rehearsal, migration decisions, secret/admin rotation, provider validation,
+CORS/header smoke tests, dependency response, readiness alerting, request-ID
+incident correlation, and Market Engine enablement. A repository merge alone
+does not prove any of those external actions.

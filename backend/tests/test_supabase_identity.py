@@ -5,6 +5,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.api import deps
+from app.core import supabase as supabase_module
 from app import main
 from app.core.config import settings
 from app.core.database import engine
@@ -23,7 +24,9 @@ def test_supabase_identity_extracts_provider_without_trusting_client_claims(monk
             request=httpx.Request("GET", "https://project.supabase.co/auth/v1/user"),
         )
 
-    monkeypatch.setattr(deps.httpx, "get", fake_get)
+    monkeypatch.setattr(supabase_module.httpx, "get", fake_get)
+    monkeypatch.setattr(supabase_module.jwt, "get_unverified_header", lambda _token: {"alg": "HS256"})
+    deps.supabase_verifier._identities.clear()
     assert deps.supabase_identity("supabase-token") == {"id": "google-user", "email": "user@example.com", "provider": "google"}
 
 
@@ -58,6 +61,7 @@ def test_supabase_sync_is_idempotent_and_bonus_event_only_once(client, monkeypat
     monkeypatch.setattr(settings, "supabase_anon_key", "anon")
     monkeypatch.setattr(settings, "signup_bonus_gold", 100)
     monkeypatch.setattr(settings, "signup_bonus_silver", 50)
+    monkeypatch.setattr(settings, "signup_bonus_enabled", True)
     monkeypatch.setattr(settings, "database_url", "sqlite:///sync_bonus_validation.db")
     monkeypatch.setattr(main, "supabase_identity", lambda _token: {"id": "google-once", "email": "once@example.com", "provider": "google"})
 
@@ -86,7 +90,10 @@ def test_supabase_suspended_user_is_403(client, monkeypatch):
     monkeypatch.setattr(main, "supabase_identity", lambda _token: {"id": "suspended-provider", "email": "suspended@example.com", "provider": "google"})
     with Session(engine) as db:
         user = User(email="suspended@example.com", password_hash="x", date_of_birth=datetime(1990, 1, 1), age_verified=True, auth_provider="google", auth_provider_id="suspended-provider", account_status="suspended")
-        db.add(user); db.flush(); db.add(Wallet(user_id=user.id)); db.commit()
+        db.add(user)
+        db.flush()
+        db.add(Wallet(user_id=user.id))
+        db.commit()
 
     response = client.post("/api/v1/auth/supabase-sync", json={}, headers={"Authorization": "Bearer valid"})
 
